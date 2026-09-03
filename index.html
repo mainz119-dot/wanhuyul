@@ -39,7 +39,7 @@
 .tab{border:0;background:transparent;color:#7b8494;font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px 8px}.tab b{font-size:20px}.tab.active{color:var(--blue);font-weight:800}
 .page{display:none}.page.active{display:block}
 .listitem{background:var(--card);padding:16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
-.chat{display:flex;flex-direction:column;gap:10px}.bubble{max-width:78%;padding:12px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.me{background:#eaf1ff;align-self:flex-end;border-color:#d7e5ff}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;padding:12px}.bubble{max-width:78%;padding:12px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.me{background:#eaf1ff;align-self:flex-end;border-color:#d7e5ff}
 .map{height:350px;border-radius:24px;background:linear-gradient(135deg,#d8eee7,#eaf3e5 48%,#d5e6f6);position:relative;overflow:hidden}.road{position:absolute;background:#fff;opacity:.8;border-radius:20px;transform:rotate(-25deg)}.pin{position:absolute;width:58px;height:58px;border-radius:50% 50% 50% 0;background:#fff;box-shadow:var(--shadow);display:grid;place-items:center;transform:rotate(-45deg);font-size:23px}.pin span{transform:rotate(45deg)}
 .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;text-align:center}.day{padding:10px 0;border-radius:12px;font-size:13px;cursor:pointer;position:relative}.today{background:var(--blue);color:white;font-weight:800}
 .day.selected:not(.today){background:#eaf1ff;color:var(--blue);font-weight:800}
@@ -87,8 +87,7 @@ textarea.field{resize:vertical;min-height:64px}
 
   <section id="chat" class="page">
     <div class="sectiontitle">가족톡 💬</div>
-    <div class="listitem"><span>👨‍👩‍👦‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">오늘 저녁 뭐 먹을까? 😊</small></span><span>오후 12:30</span></div>
-    <div class="listitem"><span>👨 <b>아빠</b><br><small>사진 보내줘!</small></span><span>어제</span></div>
+    <div class="listitem"><span>👨‍👩‍👦‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">메시지를 불러오는 중...</small></span></div>
     <div class="card chat dmbody" id="groupMessages"></div>
     <div class="dmbar"><input id="groupInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendGroup()"><button onclick="sendGroup()">전송</button></div>
   </section>
@@ -264,32 +263,73 @@ function startCall(type){
   alert(`${name}님에게 ${type==='voice'?'음성':'영상'}통화를 겁니다 ${type==='voice'?'📞':'📹'}`);
 }
 
-/* ===== 가족톡 (그룹채팅) ===== */
-let groupChat = JSON.parse(localStorage.getItem('woorijipGroupChat')||'null') || [
-  {who:'엄마',me:false,text:'오늘 저녁 뭐 먹을까? 😊'},
-  {who:'me',me:true,text:'불고기 어때?'},
-  {who:'와니',me:false,text:'저는 치킨! 🍗'}
-];
-function renderGroup(){
-  document.getElementById('groupMessages').innerHTML=groupChat.map(m=>`<div class="bubble${m.me?' me':''}">${m.me?'':`<b style="display:block;font-size:11px;color:var(--sub);margin-bottom:2px">${m.who}</b>`}${m.text}</div>`).join('');
-  document.getElementById('groupMessages').scrollTop=999999;
-  const last=groupChat[groupChat.length-1];
-  if(last)document.getElementById('chatPreview').textContent=(last.me?'나: ':'')+last.text;
-}
-function sendGroup(){
-  const box=document.getElementById('groupInputBox');
-  const text=box.value.trim();
-  if(!text)return;
-  groupChat.push({who:'me',me:true,text});
-  box.value='';
-  localStorage.setItem('woorijipGroupChat',JSON.stringify(groupChat));
+/* ===== 가족톡 (Supabase Realtime 연동) ===== */
+let groupChat = [];
+const currentUser = family[0] || '아빠'; // 현재 기기의 기본 발신자 이름
+
+// 1. Supabase에서 기존 메시지 목록 불러오기 및 실시간 구독
+async function initGroupChat() {
+  const { data, error } = await sb
+    .from('family_messages')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('가족톡 불러오기 오류:', error);
+    return;
+  }
+
+  groupChat = data || [];
   renderGroup();
-  setTimeout(()=>{
-    const replier=family[Math.floor(Math.random()*family.length)];
-    groupChat.push({who:replier,me:false,text:autoReplies[Math.floor(Math.random()*autoReplies.length)]});
-    localStorage.setItem('woorijipGroupChat',JSON.stringify(groupChat));
-    renderGroup();
-  },900);
+
+  // Supabase Realtime 구독 설정
+  sb.channel('public:family_messages')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'family_messages' }, payload => {
+      groupChat.push(payload.new);
+      renderGroup();
+    })
+    .subscribe();
+}
+
+// 2. 메시지 화면 렌더링
+function renderGroup(){
+  const msgContainer = document.getElementById('groupMessages');
+  if(!msgContainer) return;
+
+  msgContainer.innerHTML = groupChat.map(m => {
+    const isMe = m.sender_name === currentUser;
+    return `<div class="bubble${isMe ? ' me' : ''}">
+      ${isMe ? '' : `<b style="display:block;font-size:11px;color:var(--sub);margin-bottom:2px">${m.sender_name}</b>`}
+      ${m.content}
+    </div>`;
+  }).join('');
+
+  msgContainer.scrollTop = 999999;
+
+  const last = groupChat[groupChat.length - 1];
+  if (last) {
+    const isMe = last.sender_name === currentUser;
+    document.getElementById('chatPreview').textContent = (isMe ? '나: ' : `${last.sender_name}: `) + last.content;
+  } else {
+    document.getElementById('chatPreview').textContent = '새로운 첫 메시지를 남겨보세요!';
+  }
+}
+
+// 3. 메시지 전송 (Supabase DB 저장)
+async function sendGroup(){
+  const box = document.getElementById('groupInputBox');
+  const text = box.value.trim();
+  if(!text) return;
+
+  box.value = '';
+
+  const { error } = await sb
+    .from('family_messages')
+    .insert([{ sender_name: currentUser, content: text }]);
+
+  if (error) {
+    alert('메시지 전송 실패: ' + error.message);
+  }
 }
 
 /* ===== 일정 ===== */
@@ -490,7 +530,7 @@ renderFamily();
 renderCalendar();renderSchedList();
 renderNotice();
 renderMeal();
-renderGroup();
+initGroupChat();
 loadPhotos();
 </script>
 </body>
