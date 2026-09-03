@@ -25,17 +25,16 @@
 .mealpic{height:76px;border-radius:15px;background:linear-gradient(135deg,#ffe8bd,#fff3dc);display:grid;place-items:center;font-size:36px;margin-bottom:8px}.small{font-size:12px;color:var(--sub)}
 .notice{background:linear-gradient(135deg,#f7fbff,#fff);min-height:108px}.photos{display:flex;gap:7px}.photo{height:54px;flex:1;border-radius:11px;background:linear-gradient(135deg,#b7d5f6,#f5c9d2);background-size:cover;background-position:center}
 .albumgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.albumgrid .photo{height:0;padding-top:100%;position:relative}
+.albumgrid .photo{height:0;padding-top:100%;position:relative;cursor:pointer}
 .uploadbar{border:2px dashed var(--line);border-radius:16px;padding:18px;text-align:center;color:var(--sub);font-size:13px;margin-bottom:14px;cursor:pointer}
 .uploadbar input{display:none}
-.albumgrid .photo{cursor:pointer}
 .lightbox{position:fixed;inset:0;background:rgba(10,12,20,.92);display:none;align-items:center;justify-content:center;z-index:70;flex-direction:column}
 .lightbox.show{display:flex}
 .lightbox img{max-width:92vw;max-height:74vh;border-radius:16px;object-fit:contain}
 .lightbox .lbbar{position:fixed;top:calc(14px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 16px}
 .lightbox .lbbtn{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:14px;padding:11px 14px;font-size:16px;backdrop-filter:blur(6px)}
 .lightbox .lbdel{background:rgba(230,70,70,.75)}
-.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:flex;justify-around:space-around;padding:10px 8px calc(10px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 8px calc(10px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
 .tab{border:0;background:transparent;color:#7b8494;font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px 8px}.tab b{font-size:20px}.tab.active{color:var(--blue);font-weight:800}
 .page{display:none}.page.active{display:block}
 .listitem{background:var(--card);padding:16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
@@ -80,7 +79,7 @@ textarea.field{resize:vertical;min-height:64px}
         <div class="title">우리집 🏠</div>
         <div class="sub">우리 가족의 오늘을 한눈에</div>
       </div>
-      <!-- 사용자 선택 셀렉트 박스 -->
+      <!-- 접속자(나) 선택 -->
       <select id="userSelector" class="user-select" onchange="changeCurrentUser(this.value)"></select>
     </div>
     <div class="family" id="familyHome"></div>
@@ -218,13 +217,14 @@ let currentUser = localStorage.getItem('woorijipMyName') || family[0];
 
 function initUserSelector() {
   const sel = document.getElementById('userSelector');
+  if(!sel) return;
   sel.innerHTML = family.map(name => `<option value="${name}" ${name===currentUser?'selected':''}>👤 ${name}</option>`).join('');
 }
 
 function changeCurrentUser(name) {
   currentUser = name;
   localStorage.setItem('woorijipMyName', name);
-  renderGroup(); // 내 정보 변경 시 채팅화면 내/외 파악 다시 갱신
+  renderGroup();
 }
 
 const pad=n=>String(n).padStart(2,'0');
@@ -510,7 +510,7 @@ async function deleteCurrentPhoto(){
   if(currentPhotoIdx===null)return;
   const p=photoList[currentPhotoIdx];
   if(!confirm('이 사진을 삭제할까요?'))return;
-  const {error}=await sb.error=await sb.storage.from(PHOTO_BUCKET).remove([p.name]);
+  const {error}=await sb.storage.from(PHOTO_BUCKET).remove([p.name]);
   if(error){alert('삭제 실패: '+error.message);return;}
   closeLightbox();
   loadPhotos();
