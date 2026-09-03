@@ -69,12 +69,20 @@ textarea.field{resize:vertical;min-height:64px}
 .del{border:0;background:transparent;color:#c8ccd4;font-size:15px;padding:2px 6px}
 .datepill{display:inline-block;font-size:11px;color:var(--sub);background:var(--bg);border-radius:8px;padding:2px 8px;margin-bottom:2px}
 .empty-msg{text-align:center;padding:30px 10px;color:var(--sub);font-size:13px}
+.user-select{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:13px;font-weight:700;color:var(--blue)}
 </style>
 </head>
 <body>
 <div class="app">
   <section id="home" class="page active">
-    <div class="header"><div><div class="title">우리집 🏠</div><div class="sub">우리 가족의 오늘을 한눈에</div></div><button class="iconbtn">🔔</button></div>
+    <div class="header">
+      <div>
+        <div class="title">우리집 🏠</div>
+        <div class="sub">우리 가족의 오늘을 한눈에</div>
+      </div>
+      <!-- 사용자 선택 셀렉트 박스 -->
+      <select id="userSelector" class="user-select" onchange="changeCurrentUser(this.value)"></select>
+    </div>
     <div class="family" id="familyHome"></div>
     <div class="grid">
       <div class="card"><div class="cardhead">📅 오늘 일정 <span class="more" onclick="goToPage('schedule')">더보기 ›</span></div>
@@ -205,6 +213,20 @@ const places=['회사','집','학교','학원','집'];
 let dmData = JSON.parse(localStorage.getItem('woorijipDm')||'{}');
 let activePersonIndex = null;
 
+// 내 정보(현재 접속자) 관리
+let currentUser = localStorage.getItem('woorijipMyName') || family[0];
+
+function initUserSelector() {
+  const sel = document.getElementById('userSelector');
+  sel.innerHTML = family.map(name => `<option value="${name}" ${name===currentUser?'selected':''}>👤 ${name}</option>`).join('');
+}
+
+function changeCurrentUser(name) {
+  currentUser = name;
+  localStorage.setItem('woorijipMyName', name);
+  renderGroup(); // 내 정보 변경 시 채팅화면 내/외 파악 다시 갱신
+}
+
 const pad=n=>String(n).padStart(2,'0');
 const dateKey=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
 const todayKey=()=>{const t=new Date();return dateKey(t.getFullYear(),t.getMonth(),t.getDate());};
@@ -213,8 +235,14 @@ const fmtDate=k=>{const [y,m,d]=k.split('-');return `${m}월 ${d}일`;};
 function renderFamily(){
   document.getElementById('familyHome').innerHTML=family.map((n,i)=>`<div class="person" onclick="openPersonSheet(${i})"><div class="avatar">${icons[i]}<div class="dot"></div></div><div class="name">${n}</div><div class="place">${places[i]}</div></div>`).join('');
   document.getElementById('nameEditor').innerHTML=family.map((n,i)=>`<label style="display:block;margin:9px 0 4px">${icons[i]} ${i===0?'구성원 1':i===1?'구성원 2':'구성원 '+(i+1)}</label><input id="name${i}" value="${n}">`).join('');
+  initUserSelector();
 }
-function saveNames(){family=family.map((_,i)=>document.getElementById('name'+i).value.trim()||family[i]);localStorage.setItem('woorijipFamily',JSON.stringify(family));renderFamily();alert('가족 이름을 저장했어요!');}
+function saveNames(){
+  family=family.map((_,i)=>document.getElementById('name'+i).value.trim()||family[i]);
+  localStorage.setItem('woorijipFamily',JSON.stringify(family));
+  renderFamily();
+  alert('가족 이름을 저장했어요!');
+}
 
 function openPersonSheet(i){
   activePersonIndex=i;
@@ -266,7 +294,6 @@ function startCall(type){
 
 /* ===== 가족톡 (Supabase Realtime) ===== */
 let groupChat = [];
-const currentUser = family[0] || '아빠';
 
 async function initGroupChat() {
   const { data, error } = await sb
@@ -483,7 +510,7 @@ async function deleteCurrentPhoto(){
   if(currentPhotoIdx===null)return;
   const p=photoList[currentPhotoIdx];
   if(!confirm('이 사진을 삭제할까요?'))return;
-  const {error}=await sb.storage.from(PHOTO_BUCKET).remove([p.name]);
+  const {error}=await sb.error=await sb.storage.from(PHOTO_BUCKET).remove([p.name]);
   if(error){alert('삭제 실패: '+error.message);return;}
   closeLightbox();
   loadPhotos();
