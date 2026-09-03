@@ -205,7 +205,6 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let family = JSON.parse(localStorage.getItem('woorijipFamily')||'["아빠","엄마","와니","후야","니보"]');
 const icons=['👨','👩','🧒','🧒','🧒'];
 const places=['회사','집','학교','학원','집'];
-let dmData = JSON.parse(localStorage.getItem('woorijipDm')||'{}');
 let activePersonIndex = null;
 
 let currentUser = localStorage.getItem('woorijipMyName') || family[0];
@@ -221,6 +220,9 @@ function changeCurrentUser(name) {
   currentUser = name;
   localStorage.setItem('woorijipMyName', name);
   renderGroup();
+  if(document.getElementById('dm').classList.contains('active')) {
+    loadDm();
+  }
 }
 
 const pad=n=>String(n).padStart(2,'0');
@@ -271,45 +273,106 @@ function goToPage(id){
 }
 function goHome(){goToPage('home');}
 
-/* ===== 1:1 DM ===== */
-function openDm(){closeSheet();goToPage('dm');renderDm();}
-function renderDm(){
+/* ===== 1:1 실시간 DM (Supabase DB 연동) ===== */
+let dmMessagesList = [];
+
+function openDm(){
+  closeSheet();
+  goToPage('dm');
+  loadDm();
+}
+
+async function loadDm(){
   if(activePersonIndex===null) return;
-  const i=activePersonIndex;
-  document.getElementById('dmAvatar').textContent=icons[i]||'👤';
-  document.getElementById('dmName').textContent=family[i];
-  if(!dmData[family[i]])dmData[family[i]]=[];
-  const msgs=dmData[family[i]];
-  const msgElem = document.getElementById('dmMessages');
-  if(msgElem){
-    msgElem.innerHTML=msgs.length ? msgs.map(m=>`<div class="bubble${m.me?' me':''}">${m.text}</div>`).join('') : '<div class="empty-msg">대화 내용이 없습니다. 첫 메시지를 보내보세요!</div>';
-    msgElem.scrollTop=999999;
+  const targetUser = family[activePersonIndex];
+  
+  document.getElementById('dmAvatar').textContent = icons[activePersonIndex] || '👤';
+  document.getElementById('dmName').textContent = targetUser;
+
+  // 두 사람 간의 대화 내역 조회
+  const { data, error } = await sb
+    .from('direct_messages')
+    .select('*')
+    .or(`and(sender_name.eq.${currentUser},receiver_name.eq.${targetUser}),and(sender_name.eq.${targetUser},receiver_name.eq.${currentUser})`)
+    .order('created_at', { ascending: true });
+
+  if (!error && data) {
+    dmMessagesList = data;
+    renderDm();
+  } else if (error) {
+    console.error('1:1 대화 불러오기 실패:', error);
   }
 }
-function sendDm(){
-  const box=document.getElementById('dmInputBox');
-  if(!box) return;
-  const text=box.value.trim();
-  if(!text||activePersonIndex===null)return;
-  const name=family[activePersonIndex];
-  if(!dmData[name])dmData[name]=[];
-  dmData[name].push({me:true,text});
-  box.value='';
-  localStorage.setItem('woorijipDm',JSON.stringify(dmData));
-  renderDm();
+
+function renderDm(){
+  const msgElem = document.getElementById('dmMessages');
+  if(!msgElem) return;
+
+  msgElem.innerHTML = dmMessagesList.length ? dmMessagesList.map(m => {
+    const isMe = m.sender_name === currentUser;
+    return `<div class="bubble${isMe ? ' me' : ''}">${m.content}</div>`;
+  }).join('') : '<div class="empty-msg">대화 내용이 없습니다. 첫 메시지를 보내보세요!</div>';
+  
+  msgElem.scrollTop = 999999;
 }
+
+async function sendDm(){
+  const box = document.getElementById('dmInputBox');
+  if(!box) return;
+  const text = box.value.trim();
+  if(!text || activePersonIndex === null) return;
+
+  const targetUser = family[activePersonIndex];
+  box.value = '';
+
+  const { data, error } = await sb
+    .from('direct_messages')
+    .insert([{ sender_name: currentUser, receiver_name: targetUser, content: text }])
+    .select();
+
+  if (error) {
+    alert('메시지 전송 실패: ' + error.message);
+  } else if (data && data.length > 0) {
+    const exists = dmMessagesList.some(m => m.id === data[0].id);
+    if (!exists) {
+      dmMessagesList.push(data[0]);
+      renderDm();
+    }
+  }
+}
+
+function initDmRealtime() {
+  sb.channel('public:direct_messages')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, payload => {
+      const msg = payload.new;
+      if (activePersonIndex !== null) {
+        const targetUser = family[activePersonIndex];
+        // 현재 열려있는 1:1 대화 상대와 관련이 있는 메시지인 경우에만 화면에 추가
+        const isRelated = (msg.sender_name === currentUser && msg.receiver_name === targetUser) ||
+                          (msg.sender_name === targetUser && msg.receiver_name === currentUser);
+        if (isRelated) {
+          const exists = dmMessagesList.some(m => m.id === msg.id);
+          if (!exists) {
+            dmMessagesList.push(msg);
+            renderDm();
+          }
+        }
+      }
+    })
+    .subscribe();
+}
+
 function startCall(type){
   const name=family[activePersonIndex];
   closeSheet();
   alert(`${name}님에게 ${type==='voice'?'음성':'영상'}통화를 겁니다 ${type==='voice'?'📞':'📹'}`);
 }
 
-/* ===== 가족톡 (Supabase Realtime 개선) ===== */
+/* ===== 가족톡 (Supabase Realtime) ===== */
 let groupChat = [];
 
 async function initGroupChat() {
   try {
-    // 1. 기존 메시지 로드
     const { data, error } = await sb
       .from('family_messages')
       .select('*')
@@ -322,19 +385,15 @@ async function initGroupChat() {
       console.error('기존 채팅 불러오기 오류:', error);
     }
 
-    // 2. Realtime 채널 등록
     sb.channel('public:family_messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'family_messages' }, payload => {
-        // 이미 들어온 메시지 중복 체크
         const exists = groupChat.some(m => m.id && m.id === payload.new.id);
         if (!exists) {
           groupChat.push(payload.new);
           renderGroup();
         }
       })
-      .subscribe((status) => {
-        console.log('Realtime 구독 상태:', status);
-      });
+      .subscribe();
   } catch(e) {
     console.error('채팅 연결 예외:', e);
   }
@@ -380,9 +439,8 @@ async function sendGroup(){
     .select();
 
   if (error) {
-    alert('메시지 전송 실패 (RLS 권한을 확인하세요): ' + error.message);
+    alert('메시지 전송 실패: ' + error.message);
   } else if (data && data.length > 0) {
-    // 내가 보낸 메시지는 수신을 안 기다리고 화면에 바로 동기화
     const exists = groupChat.some(m => m.id === data[0].id);
     if (!exists) {
       groupChat.push(data[0]);
@@ -602,7 +660,7 @@ function initKakaoMap(){
   }
 }
 
-// 초기화 순서 보장
+// 초기화 순서
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>goToPage(b.dataset.page));
   renderFamily();
@@ -611,6 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderNotice();
   renderMeal();
   initGroupChat();
+  initDmRealtime();
   loadPhotos();
 });
 </script>
