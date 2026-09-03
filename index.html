@@ -19,7 +19,6 @@
 .avatar{width:52px;height:52px;margin:auto;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#e7eefc,#fff);border:1px solid var(--line);font-size:24px;position:relative}
 .dot{width:10px;height:10px;background:#29b765;border:2px solid white;border-radius:50%;position:relative;left:34px;top:-10px;margin-bottom:-10px}
 
-/* 읽지 않은 메시지 배지 스타일 */
 .badge{position:absolute;top:-2px;right:-2px;background:#ff3b30;color:#fff;font-size:11px;font-weight:800;border-radius:10px;padding:2px 6px;border:2px solid #fff;display:none;z-index:5}
 .badge.show{display:inline-block}
 
@@ -42,7 +41,10 @@
 .tab{border:0;background:transparent;color:#7b8494;font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px 8px}.tab b{font-size:20px}.tab.active{color:var(--blue);font-weight:800}
 .page{display:none}.page.active{display:block}
 .listitem{background:var(--card);padding:16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
-.chat{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;padding:12px}.bubble{max-width:78%;padding:12px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.me{background:#eaf1ff;align-self:flex-end;border-color:#d7e5ff}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;padding:12px}
+.bubble{max-width:78%;padding:12px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);align-self:flex-start;word-break:break-all}
+.bubble.me{background:#eaf1ff;align-self:flex-end;border-color:#d7e5ff}
+.chat-img{max-width:100%;max-height:220px;border-radius:12px;margin-top:4px;display:block;cursor:pointer}
 .map{height:350px;border-radius:24px;background:linear-gradient(135deg,#d8eee7,#eaf3e5 48%,#d5e6f6);position:relative;overflow:hidden}
 .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;text-align:center}.day{padding:10px 0;border-radius:12px;font-size:13px;cursor:pointer;position:relative}.today{background:var(--blue);color:white;font-weight:800}
 .day.selected:not(.today){background:#eaf1ff;color:var(--blue);font-weight:800}
@@ -61,9 +63,10 @@
 .dmheader .avatar{width:40px;height:40px;font-size:18px}
 .dmheader .calls{margin-left:auto;font-size:18px;letter-spacing:6px}
 .dmbody{min-height:340px;justify-content:flex-end}
-.dmbar{display:flex;gap:8px;margin-top:12px;position:sticky;bottom:8px}
-.dmbar input{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px}
-.dmbar button{border:0;background:var(--blue);color:#fff;border-radius:14px;padding:0 18px;font-weight:800}
+.dmbar{display:flex;gap:8px;margin-top:12px;position:sticky;bottom:8px;align-items:center}
+.dmbar input[type="text"]{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px}
+.dmbar button{border:0;background:var(--blue);color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;white-space:nowrap}
+.file-btn{border:1px solid var(--line);background:#fff;border-radius:14px;padding:10px 12px;font-size:18px;cursor:pointer;display:grid;place-items:center}
 .field{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;font-size:14px;margin-top:8px;font-family:inherit}
 textarea.field{resize:vertical;min-height:64px}
 .noticeitem,.mealitem{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
@@ -73,7 +76,6 @@ textarea.field{resize:vertical;min-height:64px}
 .empty-msg{text-align:center;padding:30px 10px;color:var(--sub);font-size:13px}
 .user-select{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:13px;font-weight:700;color:var(--blue)}
 
-/* 토스트 알림 팝업 */
 .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#202124;color:#fff;padding:12px 20px;border-radius:16px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;z-index:100;align-items:center;gap:8px}
 .toast.show{display:flex;animation:fadeIn 0.3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -106,7 +108,11 @@ textarea.field{resize:vertical;min-height:64px}
     <div class="sectiontitle">가족톡 💬</div>
     <div class="listitem"><span>👨‍👩‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">메시지를 불러오는 중...</small></span></div>
     <div class="card chat dmbody" id="groupMessages"></div>
-    <div class="dmbar"><input id="groupInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendGroup()"><button onclick="sendGroup()">전송</button></div>
+    <div class="dmbar">
+      <label class="file-btn" title="사진 공유">📷<input type="file" accept="image/*" style="display:none" onchange="uploadChatPhoto(this.files[0], 'group')"></label>
+      <input id="groupInputBox" type="text" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendGroup()">
+      <button onclick="sendGroup()">전송</button>
+    </div>
   </section>
 
   <section id="schedule" class="page">
@@ -155,13 +161,16 @@ textarea.field{resize:vertical;min-height:64px}
     <div class="dmheader">
       <button class="iconbtn" onclick="goHome()">←</button>
       <b style="font-size:19px">가족 앨범 📸</b>
-      <label class="iconbtn" style="margin-left:auto;cursor:pointer;font-size:13px;font-weight:700">📷 사진 추가<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this.files[0])"></label>
+      <label id="albumUploadBtn" class="iconbtn" style="margin-left:auto;cursor:pointer;font-size:13px;font-weight:700">📷 사진 추가<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this.files[0])"></label>
     </div>
     <div class="albumgrid" id="albumGrid"></div>
   </section>
 
   <div class="lightbox" id="lightbox">
-    <div class="lbbar"><button class="lbbtn" onclick="closeLightbox()">✕</button><button class="lbbtn lbdel" onclick="deleteCurrentPhoto()">🗑 삭제</button></div>
+    <div class="lbbar">
+      <button class="lbbtn" onclick="closeLightbox()">✕</button>
+      <button id="lbDeleteBtn" class="lbbtn lbdel" onclick="deleteCurrentPhoto()">🗑 삭제</button>
+    </div>
     <img id="lightboxImg" src="">
   </div>
 
@@ -173,7 +182,11 @@ textarea.field{resize:vertical;min-height:64px}
       <span class="calls">📞　📹</span>
     </div>
     <div class="card chat dmbody" id="dmMessages"></div>
-    <div class="dmbar"><input id="dmInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendDm()"><button onclick="sendDm()">전송</button></div>
+    <div class="dmbar">
+      <label class="file-btn" title="사진 공유">📷<input type="file" accept="image/*" style="display:none" onchange="uploadChatPhoto(this.files[0], 'dm')"></label>
+      <input id="dmInputBox" type="text" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendDm()">
+      <button onclick="sendDm()">전송</button>
+    </div>
   </section>
 
   <section id="more" class="page">
@@ -183,7 +196,11 @@ textarea.field{resize:vertical;min-height:64px}
     <div class="listitem" onclick="goToPage('notice')" style="cursor:pointer">📢 <b>공지사항</b><span>›</span></div>
     <div class="listitem" onclick="goToPage('meal')" style="cursor:pointer">🍱 <b>식단 관리</b><span>›</span></div>
     <div class="listitem">🎂 <b>가족 기념일</b><span>›</span></div>
-    <div class="card setting"><div class="cardhead">⚙️ 가족 이름 관리</div><div id="nameEditor"></div><button class="save" onclick="saveNames()">변경사항 저장</button></div>
+    <div id="adminSettingsCard" class="card setting">
+      <div class="cardhead">⚙️ 가족 이름 관리 <span style="font-size:11px;color:var(--blue);font-weight:400">(관리자 전용)</span></div>
+      <div id="nameEditor"></div>
+      <button class="save" onclick="saveNames()">변경사항 저장</button>
+    </div>
   </section>
 </div>
 
@@ -219,20 +236,33 @@ let family = JSON.parse(localStorage.getItem('woorijipFamily')||'["아빠","엄�
 const icons=['👨','👩','🧒','🧒','🧒'];
 const places=['회사','집','학교','학원','집'];
 let activePersonIndex = null;
-let unreadCounts = {}; // { "아빠": 2, "엄마": 0, ... }
+let unreadCounts = {}; 
 
 let currentUser = localStorage.getItem('woorijipMyName') || family[0];
+const ADMIN_NAME = family[0]; // 첫 번째 구성원(아빠)을 관리자로 지정
+
+function checkAdminPermissions() {
+  const isAdmin = currentUser === ADMIN_NAME;
+  const adminCard = document.getElementById('adminSettingsCard');
+  const albumUploadBtn = document.getElementById('albumUploadBtn');
+  const lbDeleteBtn = document.getElementById('lbDeleteBtn');
+
+  if(adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
+  if(albumUploadBtn) albumUploadBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  if(lbDeleteBtn) lbDeleteBtn.style.display = isAdmin ? 'inline-block' : 'none';
+}
 
 function initUserSelector() {
   const sel = document.getElementById('userSelector');
   if(sel) {
-    sel.innerHTML = family.map(name => `<option value="${name}" ${name===currentUser?'selected':''}>👤 ${name}</option>`).join('');
+    sel.innerHTML = family.map(name => `<option value="${name}" ${name===currentUser?'selected':''}>👤 ${name}${name===ADMIN_NAME?' (관리자)':''}</option>`).join('');
   }
 }
 
 function changeCurrentUser(name) {
   currentUser = name;
   localStorage.setItem('woorijipMyName', name);
+  checkAdminPermissions();
   renderGroup();
   fetchUnreadCounts();
   if(document.getElementById('dm').classList.contains('active')) {
@@ -250,7 +280,7 @@ function renderFamily(){
   const nameEditorElem = document.getElementById('nameEditor');
   if(familyElem) {
     familyElem.innerHTML = family.map((n,i)=>{
-      if (n === currentUser) return ''; // 나 자신은 홈에서 감추기(원할 경우)
+      if (n === currentUser) return '';
       const count = unreadCounts[n] || 0;
       return `<div class="person" onclick="openPersonSheet(${i})">
         <div class="avatar">
@@ -264,12 +294,13 @@ function renderFamily(){
     }).join('');
   }
   if(nameEditorElem) {
-    nameEditorElem.innerHTML = family.map((n,i)=>`<label style="display:block;margin:9px 0 4px">${icons[i]||'👤'} ${i===0?'구성원 1':i===1?'구성원 2':'구성원 '+(i+1)}</label><input id="name${i}" value="${n}">`).join('');
+    nameEditorElem.innerHTML = family.map((n,i)=>`<label style="display:block;margin:9px 0 4px">${icons[i]||'👤'} ${i===0?'구성원 1 (관리자)':i===1?'구성원 2':'구성원 '+(i+1)}</label><input id="name${i}" value="${n}">`).join('');
   }
   initUserSelector();
 }
 
 function saveNames(){
+  if(currentUser !== ADMIN_NAME) { alert('관리자(아빠)만 변경 가능합니다.'); return; }
   family=family.map((_,i)=>{
     const el = document.getElementById('name'+i);
     return el ? (el.value.trim()||family[i]) : family[i];
@@ -320,7 +351,34 @@ function goToPage(id){
 }
 function goHome(){goToPage('home');}
 
-/* ===== 1:1 실시간 DM & 읽지 않음 카운트 ===== */
+/* 메시지 포맷팅 (이미지 태그 변환) */
+function formatMessageContent(content) {
+  if (content.startsWith('[IMAGE]:')) {
+    const url = content.replace('[IMAGE]:', '');
+    return `<img src="${url}" class="chat-img" onclick="window.open('${url}')" alt="전송된 사진">`;
+  }
+  return content;
+}
+
+/* 채팅 이미지 업로드 */
+async function uploadChatPhoto(file, type) {
+  if(!file) return;
+  const path = `chat_${Date.now()}_${file.name}`;
+  const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, file);
+  if(error) { alert('사진 업로드 실패: ' + error.message); return; }
+  
+  const imgUrl = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+  const formattedContent = `[IMAGE]:${imgUrl}`;
+
+  if(type === 'group') {
+    await sb.from('family_messages').insert([{ sender_name: currentUser, content: formattedContent }]);
+  } else if(type === 'dm' && activePersonIndex !== null) {
+    const targetUser = family[activePersonIndex];
+    await sb.from('direct_messages').insert([{ sender_name: currentUser, receiver_name: targetUser, content: formattedContent, is_read: false }]);
+  }
+}
+
+/* ===== 1:1 실시간 DM ===== */
 let dmMessagesList = [];
 
 async function fetchUnreadCounts() {
@@ -352,7 +410,6 @@ async function loadDm(){
   document.getElementById('dmAvatar').textContent = icons[activePersonIndex] || '👤';
   document.getElementById('dmName').textContent = targetUser;
 
-  // 1. 해당 상대와의 메시지를 읽음(is_read = true) 처리
   await sb
     .from('direct_messages')
     .update({ is_read: true })
@@ -363,7 +420,6 @@ async function loadDm(){
   unreadCounts[targetUser] = 0;
   renderFamily();
 
-  // 2. 대화 내역 조회
   const { data, error } = await sb
     .from('direct_messages')
     .select('*')
@@ -382,7 +438,7 @@ function renderDm(){
 
   msgElem.innerHTML = dmMessagesList.length ? dmMessagesList.map(m => {
     const isMe = m.sender_name === currentUser;
-    return `<div class="bubble${isMe ? ' me' : ''}">${m.content}</div>`;
+    return `<div class="bubble${isMe ? ' me' : ''}">${formatMessageContent(m.content)}</div>`;
   }).join('') : '<div class="empty-msg">대화 내용이 없습니다. 첫 메시지를 보내보세요!</div>';
   
   msgElem.scrollTop = 999999;
@@ -418,22 +474,19 @@ function initDmRealtime() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async payload => {
       const msg = payload.new;
 
-      // 나에게 온 메시지인 경우 처리
       if (msg.receiver_name === currentUser) {
         const isDmActive = document.getElementById('dm').classList.contains('active');
         const targetUser = activePersonIndex !== null ? family[activePersonIndex] : null;
 
-        // 현재 해당 사용자와 1:1 창을 열어두고 있는 경우
         if (isDmActive && targetUser === msg.sender_name) {
           dmMessagesList.push(msg);
           renderDm();
-          // 즉시 읽음 처리
           await sb.from('direct_messages').update({ is_read: true }).eq('id', msg.id);
         } else {
-          // 안 열려있는 경우 -> 읽지 않은 수 증가 & 토스트 알림 표시
           unreadCounts[msg.sender_name] = (unreadCounts[msg.sender_name] || 0) + 1;
           renderFamily();
-          showToast(`${msg.sender_name}님: ${msg.content}`);
+          const displayMsg = msg.content.startsWith('[IMAGE]:') ? '📷 사진을 보냈습니다.' : msg.content;
+          showToast(`${msg.sender_name}님: ${displayMsg}`);
         }
       }
     })
@@ -468,9 +521,9 @@ async function initGroupChat() {
           groupChat.push(payload.new);
           renderGroup();
 
-          // 내가 보낸 게 아니고 가족톡 화면을 안 보고 있을 때 토스트 팝업
           if (payload.new.sender_name !== currentUser && !document.getElementById('chat').classList.contains('active')) {
-            showToast(`[가족톡] ${payload.new.sender_name}: ${payload.new.content}`);
+            const displayMsg = payload.new.content.startsWith('[IMAGE]:') ? '📷 사진을 보냈습니다.' : payload.new.content;
+            showToast(`[가족톡] ${payload.new.sender_name}: ${displayMsg}`);
           }
         }
       })
@@ -488,7 +541,7 @@ function renderGroup(){
     const isMe = m.sender_name === currentUser;
     return `<div class="bubble${isMe ? ' me' : ''}">
       ${isMe ? '' : `<b style="display:block;font-size:11px;color:var(--sub);margin-bottom:2px">${m.sender_name}</b>`}
-      ${m.content}
+      ${formatMessageContent(m.content)}
     </div>`;
   }).join('') : '<div class="empty-msg">가족들과 나눈 대화가 없습니다.</div>';
 
@@ -499,7 +552,8 @@ function renderGroup(){
   if(previewElem) {
     if (last) {
       const isMe = last.sender_name === currentUser;
-      previewElem.textContent = (isMe ? '나: ' : `${last.sender_name}: `) + last.content;
+      const text = last.content.startsWith('[IMAGE]:') ? '📷 사진' : last.content;
+      previewElem.textContent = (isMe ? '나: ' : `${last.sender_name}: `) + text;
     } else {
       previewElem.textContent = '새로운 첫 메시지를 남겨보세요!';
     }
@@ -674,14 +728,17 @@ function renderMeal(){
 /* ===== 가족 앨범 ===== */
 let photoList=[];
 let currentPhotoIdx=null;
+
 async function uploadPhoto(file){
+  if(currentUser !== ADMIN_NAME) { alert('사진 등록 권한이 없습니다.'); return; }
   if(!file)return;
-  const path=`${Date.now()}_${file.name}`;
+  const path=`album_${Date.now()}_${file.name}`;
   const {error}=await sb.storage.from(PHOTO_BUCKET).upload(path,file);
   document.getElementById('photoInput').value='';
   if(error){alert('업로드 실패: '+error.message);return;}
   loadPhotos();
 }
+
 async function loadPhotos(){
   try {
     const {data,error}=await sb.storage.from(PHOTO_BUCKET).list('',{limit:100,sortBy:{column:'created_at',order:'desc'}});
@@ -692,20 +749,24 @@ async function loadPhotos(){
       if(gridElem) gridElem.innerHTML=`<div class="small">사진을 불러오지 못했어요</div>`;
       return;
     }
-    photoList=(data||[]).filter(f=>f.name).map(f=>({name:f.name,url:sb.storage.from(PHOTO_BUCKET).getPublicUrl(f.name).data.publicUrl}));
+    // chat_으로 시작하지 않는 앨범용 사진만 필터링
+    photoList=(data||[]).filter(f=>f.name && !f.name.startsWith('chat_')).map(f=>({name:f.name,url:sb.storage.from(PHOTO_BUCKET).getPublicUrl(f.name).data.publicUrl}));
     if(gridElem) gridElem.innerHTML=photoList.length? photoList.map((p,i)=>`<div class="photo" style="background-image:url('${p.url}')" onclick="openLightbox(${i})"></div>`).join('') : '<div class="small">아직 올라온 사진이 없어요.</div>';
     if(homePhotosElem) homePhotosElem.innerHTML=photoList.slice(0,3).map(p=>`<div class="photo" style="background-image:url('${p.url}')"></div>`).join('') || '<div class="small">사진이 없어요</div>';
   } catch(e) {
     console.error('사진 로드 예외:', e);
   }
 }
+
 function openLightbox(i){
   currentPhotoIdx=i;
   document.getElementById('lightboxImg').src=photoList[i].url;
   document.getElementById('lightbox').classList.add('show');
 }
 function closeLightbox(){document.getElementById('lightbox').classList.remove('show');currentPhotoIdx=null;}
+
 async function deleteCurrentPhoto(){
+  if(currentUser !== ADMIN_NAME) { alert('관리자(아빠)만 삭제 가능합니다.'); return; }
   if(currentPhotoIdx===null)return;
   const p=photoList[currentPhotoIdx];
   if(!confirm('이 사진을 삭제할까요?'))return;
@@ -741,9 +802,9 @@ function initKakaoMap(){
   }
 }
 
-// 초기화 순서
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>goToPage(b.dataset.page));
+  checkAdminPermissions();
   fetchUnreadCounts();
   renderFamily();
   renderCalendar();
