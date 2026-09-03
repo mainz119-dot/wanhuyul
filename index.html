@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>우리집 - 가족 앱 시제품</title>
+<style>
+:root{
+  --bg:#f5f7fb; --card:#ffffff; --text:#202124; --sub:#6b7280;
+  --blue:#2f6fed; --line:#e8ebf1; --shadow:0 6px 20px rgba(30,45,70,.08);
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:var(--text)}
+.app{max-width:520px;margin:0 auto;min-height:100vh;padding:18px 16px 92px}
+.header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 18px}
+.title{font-size:29px;font-weight:800}.sub{font-size:13px;color:var(--sub);margin-top:4px}
+.iconbtn{border:0;background:var(--card);border-radius:14px;padding:11px;box-shadow:var(--shadow);font-size:18px}
+.family{display:flex;justify-content:space-between;gap:7px;margin-bottom:18px}
+.person{text-align:center;min-width:0;flex:1}.avatar{width:52px;height:52px;margin:auto;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#e7eefc,#fff);border:1px solid var(--line);font-size:24px}
+.dot{width:10px;height:10px;background:#29b765;border:2px solid white;border-radius:50%;position:relative;left:34px;top:-10px;margin-bottom:-10px}
+.name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.place{font-size:11px;color:var(--sub);margin-top:3px}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}.full{grid-column:1/-1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:var(--shadow)}
+.cardhead{display:flex;justify-content:space-between;align-items:center;font-weight:800;margin-bottom:12px}.more{font-size:12px;color:var(--sub)}
+.row{display:flex;gap:10px;padding:9px 0;border-top:1px solid #f0f2f6;font-size:13px}.row:first-of-type{border-top:0}.time{color:var(--blue);font-weight:700;min-width:42px}
+.mealpic{height:76px;border-radius:15px;background:linear-gradient(135deg,#ffe8bd,#fff3dc);display:grid;place-items:center;font-size:36px;margin-bottom:8px}.small{font-size:12px;color:var(--sub)}
+.notice{background:linear-gradient(135deg,#f7fbff,#fff);min-height:108px}.photos{display:flex;gap:7px}.photo{height:54px;flex:1;border-radius:11px;background:linear-gradient(135deg,#b7d5f6,#f5c9d2);background-size:cover;background-position:center}
+.albumgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.albumgrid .photo{height:0;padding-top:100%;position:relative}
+.uploadbar{border:2px dashed var(--line);border-radius:16px;padding:18px;text-align:center;color:var(--sub);font-size:13px;margin-bottom:14px;cursor:pointer}
+.uploadbar input{display:none}
+.albumgrid .photo{cursor:pointer}
+.lightbox{position:fixed;inset:0;background:rgba(10,12,20,.92);display:none;align-items:center;justify-content:center;z-index:70;flex-direction:column}
+.lightbox.show{display:flex}
+.lightbox img{max-width:92vw;max-height:74vh;border-radius:16px;object-fit:contain}
+.lightbox .lbbar{position:fixed;top:calc(14px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 16px}
+.lightbox .lbbtn{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:14px;padding:11px 14px;font-size:16px;backdrop-filter:blur(6px)}
+.lightbox .lbdel{background:rgba(230,70,70,.75)}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 8px calc(10px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
+.tab{border:0;background:transparent;color:#7b8494;font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px 8px}.tab b{font-size:20px}.tab.active{color:var(--blue);font-weight:800}
+.page{display:none}.page.active{display:block}
+.listitem{background:var(--card);padding:16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
+.chat{display:flex;flex-direction:column;gap:10px}.bubble{max-width:78%;padding:12px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);align-self:flex-start}.bubble.me{background:#eaf1ff;align-self:flex-end;border-color:#d7e5ff}
+.map{height:350px;border-radius:24px;background:linear-gradient(135deg,#d8eee7,#eaf3e5 48%,#d5e6f6);position:relative;overflow:hidden}.road{position:absolute;background:#fff;opacity:.8;border-radius:20px;transform:rotate(-25deg)}.pin{position:absolute;width:58px;height:58px;border-radius:50% 50% 50% 0;background:#fff;box-shadow:var(--shadow);display:grid;place-items:center;transform:rotate(-45deg);font-size:23px}.pin span{transform:rotate(45deg)}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;text-align:center}.day{padding:10px 0;border-radius:12px;font-size:13px;cursor:pointer;position:relative}.today{background:var(--blue);color:white;font-weight:800}
+.day.selected:not(.today){background:#eaf1ff;color:var(--blue);font-weight:800}
+.day.has::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--blue)}
+.today.has::after{background:#fff}
+.setting input{border:1px solid var(--line);border-radius:12px;padding:10px;width:100%;font-size:15px}.save{width:100%;border:0;background:var(--blue);color:#fff;padding:14px;border-radius:14px;font-weight:800;margin-top:12px}
+.sectiontitle{font-size:23px;font-weight:800;margin:8px 0 16px}
+.overlay{position:fixed;inset:0;background:rgba(20,25,40,.45);display:none;align-items:flex-end;justify-content:center;z-index:60}
+.overlay.show{display:flex}
+.sheet{width:min(520px,100%);background:#fff;border-radius:26px 26px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(20,25,40,.18)}
+.sheethead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.sheethead .avatar{width:44px;height:44px;font-size:20px}
+.sheetbtn{width:100%;border:0;background:var(--bg);border-radius:16px;padding:14px 16px;font-size:15px;font-weight:700;text-align:left;margin-bottom:9px;display:flex;align-items:center;gap:10px}
+.sheetbtn.cancel{background:transparent;color:var(--sub);justify-content:center;font-weight:600;margin-top:4px;margin-bottom:0}
+.person{cursor:pointer}
+.dmheader{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.dmheader .avatar{width:40px;height:40px;font-size:18px}
+.dmheader .calls{margin-left:auto;font-size:18px;letter-spacing:6px}
+.dmbody{min-height:340px;justify-content:flex-end}
+.dmbar{display:flex;gap:8px;margin-top:12px;position:sticky;bottom:8px}
+.dmbar input{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px}
+.dmbar button{border:0;background:var(--blue);color:#fff;border-radius:14px;padding:0 18px;font-weight:800}
+.field{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;font-size:14px;margin-top:8px;font-family:inherit}
+textarea.field{resize:vertical;min-height:64px}
+.noticeitem,.mealitem{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+.noticeitem .top,.mealitem .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.del{border:0;background:transparent;color:#c8ccd4;font-size:15px;padding:2px 6px}
+.datepill{display:inline-block;font-size:11px;color:var(--sub);background:var(--bg);border-radius:8px;padding:2px 8px;margin-bottom:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <section id="home" class="page active">
+    <div class="header"><div><div class="title">우리집 🏠</div><div class="sub">우리 가족의 오늘을 한눈에</div></div><button class="iconbtn">🔔</button></div>
+    <div class="family" id="familyHome"></div>
+    <div class="grid">
+      <div class="card"><div class="cardhead">📅 오늘 일정 <span class="more" onclick="goToPage('schedule')">더보기 ›</span></div>
+        <div id="homeSchedList"></div>
+      </div>
+      <div class="card" id="homeMealCard" onclick="goToPage('meal')" style="cursor:pointer"><div class="cardhead">🍱 오늘 메뉴</div><div id="homeMealBody"></div></div>
+      <div class="card notice" onclick="goToPage('notice')" style="cursor:pointer"><div class="cardhead">📢 새로운 공지 <span class="more">›</span></div><div id="homeNoticeBody"></div></div>
+      <div class="card" onclick="goToPage('album')" style="cursor:pointer"><div class="cardhead">📸 최근 사진 <span class="more">›</span></div><div class="photos" id="homePhotos"></div></div>
+    </div>
+  </section>
+
+  <section id="chat" class="page">
+    <div class="sectiontitle">가족톡 💬</div>
+    <div class="listitem"><span>👨‍👩‍👦‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">오늘 저녁 뭐 먹을까? 😊</small></span><span>오후 12:30</span></div>
+    <div class="listitem"><span>👨 <b>아빠</b><br><small>사진 보내줘!</small></span><span>어제</span></div>
+    <div class="card chat dmbody" id="groupMessages"></div>
+    <div class="dmbar"><input id="groupInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendGroup()"><button onclick="sendGroup()">전송</button></div>
+  </section>
+
+  <section id="schedule" class="page">
+    <div class="sectiontitle" id="calTitle">2026년 9월 📅</div>
+    <div class="card"><div class="calendar" id="calGrid"></div></div>
+    <div class="card" style="margin-top:14px">
+      <div class="cardhead"><span id="schedDateLabel">오늘 일정</span><span class="more" onclick="toggleSchedForm()">+ 추가</span></div>
+      <div id="schedList"></div>
+      <div id="schedForm" style="display:none">
+        <input id="schedTime" class="field" type="time">
+        <input id="schedText" class="field" placeholder="일정 내용 (예: 🏥 병원 예약)">
+        <button class="save" onclick="saveSched()">저장</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="map" class="page">
+    <div class="sectiontitle">가족 지도 📍</div>
+    <div id="kakaoMap" class="map"></div>
+    <div class="listitem" style="margin-top:12px"><span>👨 <b>아빠</b><br><small>회사 · 5분 전</small></span><span>›</span></div>
+    <div class="listitem"><span>👩 <b>엄마</b><br><small>집 · 현재</small></span><span>›</span></div>
+  </section>
+
+  <section id="notice" class="page">
+    <div class="dmheader"><button class="iconbtn" onclick="goHome()">←</button><b style="font-size:19px">공지사항 📢</b><span class="calls" style="margin-left:auto;letter-spacing:0" onclick="toggleNoticeForm()"><span class="more">+ 새 공지</span></span></div>
+    <div class="card" id="noticeForm" style="display:none;margin-bottom:14px">
+      <input id="noticeTitle" class="field" placeholder="제목 (예: 이번 주 토요일)">
+      <textarea id="noticeText" class="field" placeholder="내용을 입력하세요"></textarea>
+      <button class="save" onclick="saveNotice()">등록</button>
+    </div>
+    <div id="noticeList"></div>
+  </section>
+
+  <section id="meal" class="page">
+    <div class="dmheader"><button class="iconbtn" onclick="goHome()">←</button><b style="font-size:19px">식단 관리 🍱</b></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="cardhead">오늘 식단 입력</div>
+      <input id="mealMenu" class="field" placeholder="메인 메뉴 (예: 불고기)">
+      <input id="mealSide" class="field" placeholder="반찬 (예: 된장국 · 시금치)">
+      <button class="save" onclick="saveMeal()">저장</button>
+    </div>
+    <div id="mealList"></div>
+  </section>
+
+  <section id="album" class="page">
+    <div class="dmheader">
+      <button class="iconbtn" onclick="goHome()">←</button>
+      <b style="font-size:19px">가족 앨범 📸</b>
+      <label class="iconbtn" style="margin-left:auto;cursor:pointer;font-size:13px;font-weight:700">📷 사진 추가<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto(this.files[0])"></label>
+    </div>
+    <div class="albumgrid" id="albumGrid"></div>
+  </section>
+
+  <div class="lightbox" id="lightbox">
+    <div class="lbbar"><button class="lbbtn" onclick="closeLightbox()">✕</button><button class="lbbtn lbdel" onclick="deleteCurrentPhoto()">🗑 삭제</button></div>
+    <img id="lightboxImg" src="">
+  </div>
+
+  <section id="dm" class="page">
+    <div class="dmheader">
+      <button class="iconbtn" onclick="goHome()">←</button>
+      <div class="avatar" id="dmAvatar"></div>
+      <b id="dmName"></b>
+      <span class="calls">📞　📹</span>
+    </div>
+    <div class="card chat dmbody" id="dmMessages"></div>
+    <div class="dmbar"><input id="dmInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendDm()"><button onclick="sendDm()">전송</button></div>
+  </section>
+
+  <section id="more" class="page">
+    <div class="sectiontitle">더보기 ☰</div>
+    <div class="listitem" onclick="goToPage('album')" style="cursor:pointer">📸 <b>가족 앨범</b><span>›</span></div>
+    <div class="listitem">📁 <b>자료실</b><span>›</span></div>
+    <div class="listitem" onclick="goToPage('notice')" style="cursor:pointer">📢 <b>공지사항</b><span>›</span></div>
+    <div class="listitem" onclick="goToPage('meal')" style="cursor:pointer">🍱 <b>식단 관리</b><span>›</span></div>
+    <div class="listitem">🎂 <b>가족 기념일</b><span>›</span></div>
+    <div class="card setting"><div class="cardhead">⚙️ 가족 이름 관리</div><div id="nameEditor"></div><button class="save" onclick="saveNames()">변경사항 저장</button></div>
+  </section>
+</div>
+<div class="overlay" id="personOverlay" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet">
+    <div class="sheethead"><div class="avatar" id="sheetAvatar"></div><div><b id="sheetName"></b><div class="small" id="sheetPlace"></div></div></div>
+    <button class="sheetbtn" onclick="openDm()">💬 1:1 채팅</button>
+    <button class="sheetbtn" onclick="startCall('voice')">📞 음성통화</button>
+    <button class="sheetbtn" onclick="startCall('video')">📹 영상통화</button>
+    <button class="sheetbtn cancel" onclick="closeSheet()">취소</button>
+  </div>
+</div>
+<nav class="nav">
+  <button class="tab active" data-page="home"><b>⌂</b>홈</button>
+  <button class="tab" data-page="chat"><b>◌</b>가족톡</button>
+  <button class="tab" data-page="schedule"><b>▣</b>일정</button>
+  <button class="tab" data-page="map"><b>⌖</b>지도</button>
+  <button class="tab" data-page="more"><b>☰</b>더보기</button>
+</nav>
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8df232422f24bc7cf58bca2734e9f1e8&autoload=false"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://ogrqjrtulhrpuuqnymkh.supabase.co';
+const SUPABASE_KEY='sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN';
+const PHOTO_BUCKET='family-photos';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let family = JSON.parse(localStorage.getItem('woorijipFamily')||'["아빠","엄마","와니","후야","니보"]');
+const icons=['👨','👩','🧒','🧒','🧒'];
+const places=['회사','집','학교','학원','집'];
+let dmData = JSON.parse(localStorage.getItem('woorijipDm')||'{}');
+let activePersonIndex = null;
+const autoReplies=['응 알겠어! 😊','지금 확인해볼게','좋아 조금 이따 얘기하자','ㅋㅋㅋ 그러자','응응 알았어~'];
+const pad=n=>String(n).padStart(2,'0');
+const dateKey=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
+const todayKey=()=>{const t=new Date();return dateKey(t.getFullYear(),t.getMonth(),t.getDate());};
+const fmtDate=k=>{const [y,m,d]=k.split('-');return `${m}월 ${d}일`;};
+
+function renderFamily(){
+  document.getElementById('familyHome').innerHTML=family.map((n,i)=>`<div class="person" onclick="openPersonSheet(${i})"><div class="avatar">${icons[i]}<div class="dot"></div></div><div class="name">${n}</div><div class="place">${places[i]}</div></div>`).join('');
+  document.getElementById('nameEditor').innerHTML=family.map((n,i)=>`<label style="display:block;margin:9px 0 4px">${icons[i]} ${i===0?'구성원 1':i===1?'구성원 2':'구성원 '+(i+1)}</label><input id="name${i}" value="${n}">`).join('');
+}
+function saveNames(){family=family.map((_,i)=>document.getElementById('name'+i).value.trim()||family[i]);localStorage.setItem('woorijipFamily',JSON.stringify(family));renderFamily();alert('가족 이름을 저장했어요!');}
+
+function openPersonSheet(i){
+  activePersonIndex=i;
+  document.getElementById('sheetAvatar').textContent=icons[i];
+  document.getElementById('sheetName').textContent=family[i];
+  document.getElementById('sheetPlace').textContent=places[i];
+  document.getElementById('personOverlay').classList.add('show');
+}
+function closeSheet(){document.getElementById('personOverlay').classList.remove('show');}
+
+function goToPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  const tab=document.querySelector(`.tab[data-page="${id}"]`);
+  if(tab)tab.classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='map')initKakaoMap();
+}
+function goHome(){goToPage('home');}
+
+function openDm(){closeSheet();goToPage('dm');renderDm();}
+function renderDm(){
+  const i=activePersonIndex;
+  document.getElementById('dmAvatar').textContent=icons[i];
+  document.getElementById('dmName').textContent=family[i];
+  if(!dmData[family[i]])dmData[family[i]]=[{me:false,text:'안녕! 👋'}];
+  const msgs=dmData[family[i]];
+  document.getElementById('dmMessages').innerHTML=msgs.map(m=>`<div class="bubble${m.me?' me':''}">${m.text}</div>`).join('');
+  document.getElementById('dmMessages').scrollTop=999999;
+}
+function sendDm(){
+  const box=document.getElementById('dmInputBox');
+  const text=box.value.trim();
+  if(!text||activePersonIndex===null)return;
+  const name=family[activePersonIndex];
+  dmData[name].push({me:true,text});
+  box.value='';
+  localStorage.setItem('woorijipDm',JSON.stringify(dmData));
+  renderDm();
+  setTimeout(()=>{
+    dmData[name].push({me:false,text:autoReplies[Math.floor(Math.random()*autoReplies.length)]});
+    localStorage.setItem('woorijipDm',JSON.stringify(dmData));
+    if(activePersonIndex!==null&&family[activePersonIndex]===name)renderDm();
+  },700);
+}
+function startCall(type){
+  const name=family[activePersonIndex];
+  closeSheet();
+  alert(`${name}님에게 ${type==='voice'?'음성':'영상'}통화를 겁니다 ${type==='voice'?'📞':'📹'}`);
+}
+
+/* ===== 가족톡 (그룹채팅) ===== */
+let groupChat = JSON.parse(localStorage.getItem('woorijipGroupChat')||'null') || [
+  {who:'엄마',me:false,text:'오늘 저녁 뭐 먹을까? 😊'},
+  {who:'me',me:true,text:'불고기 어때?'},
+  {who:'와니',me:false,text:'저는 치킨! 🍗'}
+];
+function renderGroup(){
+  document.getElementById('groupMessages').innerHTML=groupChat.map(m=>`<div class="bubble${m.me?' me':''}">${m.me?'':`<b style="display:block;font-size:11px;color:var(--sub);margin-bottom:2px">${m.who}</b>`}${m.text}</div>`).join('');
+  document.getElementById('groupMessages').scrollTop=999999;
+  const last=groupChat[groupChat.length-1];
+  if(last)document.getElementById('chatPreview').textContent=(last.me?'나: ':'')+last.text;
+}
+function sendGroup(){
+  const box=document.getElementById('groupInputBox');
+  const text=box.value.trim();
+  if(!text)return;
+  groupChat.push({who:'me',me:true,text});
+  box.value='';
+  localStorage.setItem('woorijipGroupChat',JSON.stringify(groupChat));
+  renderGroup();
+  setTimeout(()=>{
+    const replier=family[Math.floor(Math.random()*family.length)];
+    groupChat.push({who:replier,me:false,text:autoReplies[Math.floor(Math.random()*autoReplies.length)]});
+    localStorage.setItem('woorijipGroupChat',JSON.stringify(groupChat));
+    renderGroup();
+  },900);
+}
+
+/* ===== 일정 ===== */
+let scheduleData = JSON.parse(localStorage.getItem('woorijipSchedule')||'null') || {};
+if(!scheduleData[todayKey()]){
+  scheduleData[todayKey()]=[
+    {id:1,time:'15:00',text:'🏥 병원 예약'},
+    {id:2,time:'17:00',text:'🎒 학원'},
+    {id:3,time:'19:00',text:'🍽️ 가족 저녁식사'}
+  ];
+}
+let calDate = new Date();
+let selectedDate = todayKey();
+let editingSchedId = null;
+
+function renderCalendar(){
+  const y=calDate.getFullYear(), m=calDate.getMonth();
+  document.getElementById('calTitle').textContent=`${y}년 ${m+1}월 📅`;
+  const first=new Date(y,m,1).getDay();
+  const days=new Date(y,m+1,0).getDate();
+  let html='<b>일</b><b>월</b><b>화</b><b>수</b><b>목</b><b>금</b><b>토</b>';
+  for(let i=0;i<first;i++)html+='<span></span>';
+  const realToday=todayKey();
+  for(let d=1;d<=days;d++){
+    const key=dateKey(y,m,d);
+    let cls='day';
+    if(key===realToday)cls+=' today';
+    if(key===selectedDate)cls+=' selected';
+    if(scheduleData[key]&&scheduleData[key].length)cls+=' has';
+    html+=`<span class="${cls}" onclick="selectDate('${key}')">${d}</span>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+function selectDate(key){selectedDate=key;document.getElementById('schedForm').style.display='none';renderCalendar();renderSchedList();}
+function renderSchedList(){
+  document.getElementById('schedDateLabel').textContent=(selectedDate===todayKey()?'오늘 일정 · ':'')+fmtDate(selectedDate);
+  const list=(scheduleData[selectedDate]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
+  document.getElementById('schedList').innerHTML=list.length? list.map(it=>
+    `<div class="row"><span class="time">${it.time}</span><span style="flex:1;cursor:pointer" onclick="editSched(${it.id})">${it.text}</span><button class="del" onclick="deleteSched(${it.id})">✕</button></div>`
+  ).join('') : '<div class="small" style="padding:10px 0">등록된 일정이 없어요.</div>';
+  renderHomeSchedule();
+}
+function toggleSchedForm(){
+  editingSchedId=null;
+  document.getElementById('schedTime').value='';
+  document.getElementById('schedText').value='';
+  const f=document.getElementById('schedForm');
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+function editSched(id){
+  const it=(scheduleData[selectedDate]||[]).find(x=>x.id===id);
+  if(!it)return;
+  editingSchedId=id;
+  document.getElementById('schedTime').value=it.time;
+  document.getElementById('schedText').value=it.text;
+  document.getElementById('schedForm').style.display='block';
+}
+function saveSched(){
+  const time=document.getElementById('schedTime').value||'00:00';
+  const text=document.getElementById('schedText').value.trim();
+  if(!text)return;
+  if(!scheduleData[selectedDate])scheduleData[selectedDate]=[];
+  if(editingSchedId){
+    const it=scheduleData[selectedDate].find(x=>x.id===editingSchedId);
+    if(it){it.time=time;it.text=text;}
+  }else{
+    scheduleData[selectedDate].push({id:Date.now(),time,text});
+  }
+  localStorage.setItem('woorijipSchedule',JSON.stringify(scheduleData));
+  document.getElementById('schedForm').style.display='none';
+  renderCalendar();renderSchedList();
+}
+function deleteSched(id){
+  scheduleData[selectedDate]=(scheduleData[selectedDate]||[]).filter(x=>x.id!==id);
+  localStorage.setItem('woorijipSchedule',JSON.stringify(scheduleData));
+  renderCalendar();renderSchedList();
+}
+function renderHomeSchedule(){
+  const list=(scheduleData[todayKey()]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
+  document.getElementById('homeSchedList').innerHTML=list.length? list.map(it=>`<div class="row"><span class="time">${it.time}</span>${it.text}</div>`).join('') : '<div class="small" style="padding:6px 0">오늘 등록된 일정이 없어요.</div>';
+}
+
+/* ===== 공지사항 ===== */
+let noticeData = JSON.parse(localStorage.getItem('woorijipNotice')||'null') || [
+  {id:1,title:'이번 주 토요일',text:'할머니 댁 방문합니다.',date:todayKey()}
+];
+function toggleNoticeForm(){
+  document.getElementById('noticeTitle').value='';
+  document.getElementById('noticeText').value='';
+  const f=document.getElementById('noticeForm');
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+function saveNotice(){
+  const title=document.getElementById('noticeTitle').value.trim();
+  const text=document.getElementById('noticeText').value.trim();
+  if(!title||!text)return;
+  noticeData.unshift({id:Date.now(),title,text,date:todayKey()});
+  localStorage.setItem('woorijipNotice',JSON.stringify(noticeData));
+  document.getElementById('noticeForm').style.display='none';
+  renderNotice();
+}
+function deleteNotice(id){
+  noticeData=noticeData.filter(n=>n.id!==id);
+  localStorage.setItem('woorijipNotice',JSON.stringify(noticeData));
+  renderNotice();
+}
+function renderNotice(){
+  document.getElementById('noticeList').innerHTML=noticeData.length? noticeData.map(n=>
+    `<div class="noticeitem"><div class="top"><span class="datepill">${fmtDate(n.date)}</span><button class="del" onclick="deleteNotice(${n.id})">✕</button></div><b>${n.title}</b><div class="small" style="margin-top:4px">${n.text}</div></div>`
+  ).join('') : '<div class="small">등록된 공지가 없어요.</div>';
+  const first=noticeData[0];
+  document.getElementById('homeNoticeBody').innerHTML=first? `<b>${first.title}</b><div class="small" style="margin-top:8px">${first.text}</div>` : '<div class="small">등록된 공지가 없어요.</div>';
+}
+
+/* ===== 식단 ===== */
+let mealData = JSON.parse(localStorage.getItem('woorijipMeal')||'null') || {[todayKey()]:{menu:'불고기',side:'된장국 · 시금치'}};
+function saveMeal(){
+  const menu=document.getElementById('mealMenu').value.trim();
+  const side=document.getElementById('mealSide').value.trim();
+  if(!menu)return;
+  mealData[todayKey()]={menu,side};
+  localStorage.setItem('woorijipMeal',JSON.stringify(mealData));
+  document.getElementById('mealMenu').value='';document.getElementById('mealSide').value='';
+  renderMeal();
+}
+function renderMeal(){
+  const keys=Object.keys(mealData).sort().reverse();
+  document.getElementById('mealList').innerHTML=keys.length? keys.map(k=>
+    `<div class="mealitem"><span class="datepill">${fmtDate(k)}${k===todayKey()?' · 오늘':''}</span><b style="display:block;margin-top:4px">${mealData[k].menu}</b>${mealData[k].side?`<div class="small">${mealData[k].side}</div>`:''}</div>`
+  ).join('') : '<div class="small">등록된 식단이 없어요.</div>';
+  const today=mealData[todayKey()];
+  document.getElementById('homeMealBody').innerHTML=today? `<div class="mealpic">🍚 🥘</div><b>${today.menu}</b>${today.side?`<div class="small">${today.side}</div>`:''}` : '<div class="small" style="padding:12px 0">오늘 식단이 없어요. 눌러서 입력하기</div>';
+}
+
+/* ===== 가족 앨범 (Supabase Storage) ===== */
+let photoList=[];
+let currentPhotoIdx=null;
+async function uploadPhoto(file){
+  if(!file)return;
+  const path=`${Date.now()}_${file.name}`;
+  const {error}=await sb.storage.from(PHOTO_BUCKET).upload(path,file);
+  document.getElementById('photoInput').value='';
+  if(error){alert('업로드 실패: '+error.message+'\n(Supabase Storage 버킷/정책 설정을 확인해주세요)');return;}
+  loadPhotos();
+}
+async function loadPhotos(){
+  const {data,error}=await sb.storage.from(PHOTO_BUCKET).list('',{limit:100,sortBy:{column:'created_at',order:'desc'}});
+  if(error){
+    document.getElementById('albumGrid').innerHTML=`<div class="small">사진을 불러오지 못했어요 (${error.message})</div>`;
+    return;
+  }
+  photoList=(data||[]).filter(f=>f.name).map(f=>({name:f.name,url:sb.storage.from(PHOTO_BUCKET).getPublicUrl(f.name).data.publicUrl}));
+  document.getElementById('albumGrid').innerHTML=photoList.length? photoList.map((p,i)=>`<div class="photo" style="background-image:url('${p.url}')" onclick="openLightbox(${i})"></div>`).join('') : '<div class="small">아직 올라온 사진이 없어요.</div>';
+  document.getElementById('homePhotos').innerHTML=photoList.slice(0,3).map(p=>`<div class="photo" style="background-image:url('${p.url}')"></div>`).join('') || '<div class="small">사진이 없어요</div>';
+}
+function openLightbox(i){
+  currentPhotoIdx=i;
+  document.getElementById('lightboxImg').src=photoList[i].url;
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('show');currentPhotoIdx=null;}
+async function deleteCurrentPhoto(){
+  if(currentPhotoIdx===null)return;
+  const p=photoList[currentPhotoIdx];
+  if(!confirm('이 사진을 삭제할까요?'))return;
+  const {error}=await sb.storage.from(PHOTO_BUCKET).remove([p.name]);
+  if(error){alert('삭제 실패: '+error.message);return;}
+  closeLightbox();
+  loadPhotos();
+}
+
+/* ===== 가족 지도 (카카오맵) ===== */
+let kakaoMap=null;
+const familySpots=[
+  {icon:'👨',name:'아빠',place:'회사',lat:37.2058,lng:127.0798},
+  {icon:'👩',name:'엄마',place:'집',lat:37.1998,lng:127.0710},
+  {icon:'🏠',name:'우리집',place:'집',lat:37.1998,lng:127.0710}
+];
+function initKakaoMap(){
+  if(kakaoMap){kakaoMap.relayout();kakaoMap.setCenter(new kakao.maps.LatLng(37.1998,127.0710));return;}
+  kakao.maps.load(()=>{
+    const center=new kakao.maps.LatLng(37.1998,127.0710);
+    kakaoMap=new kakao.maps.Map(document.getElementById('kakaoMap'),{center,level:6});
+    familySpots.forEach(s=>{
+      const overlay=new kakao.maps.CustomOverlay({
+        position:new kakao.maps.LatLng(s.lat,s.lng),
+        yAnchor:1,
+        content:`<div style="width:46px;height:46px;border-radius:50% 50% 50% 0;background:#fff;box-shadow:0 6px 16px rgba(30,45,70,.18);display:flex;align-items:center;justify-content:center;transform:rotate(-45deg);font-size:21px;border:1px solid #e8ebf1"><span style="display:block;transform:rotate(45deg)">${s.icon}</span></div>`
+      });
+      overlay.setMap(kakaoMap);
+    });
+    setTimeout(()=>kakaoMap.relayout(),50);
+  });
+}
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>goToPage(b.dataset.page));
+renderFamily();
+renderCalendar();renderSchedList();
+renderNotice();
+renderMeal();
+renderGroup();
+loadPhotos();
+</script>
+</body>
+</html>
