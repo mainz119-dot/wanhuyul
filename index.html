@@ -448,7 +448,7 @@ async function initSchedule(){
     scheduleData = {};
     data.forEach(row=>{
       if(!scheduleData[row.date]) scheduleData[row.date] = [];
-      scheduleData[row.date].push({ id: row.id, time: row.time, text: row.content });
+      scheduleData[row.date].push({ id: row.id, time: row.time, text: row.content, createdBy: row.created_by });
     });
   }
   renderCalendar(); renderSchedList();
@@ -456,6 +456,7 @@ async function initSchedule(){
     .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_items' }, ()=>initSchedule())
     .subscribe();
 }
+function canManage(createdBy){ return currentUser===ADMIN_NAME || currentUser===createdBy; }
 
 function renderCalendar(){
   const calTitleElem = document.getElementById('calTitle');
@@ -486,7 +487,7 @@ function renderSchedList(){
   labelElem.textContent=(selectedDate===todayKey()?'오늘 일정 · ':'')+fmtDate(selectedDate);
   const list=(scheduleData[selectedDate]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time));
   listElem.innerHTML=list.length? list.map(it=>
-    `<div class="row"><span class="time">${it.time}</span><span style="flex:1;cursor:pointer" onclick="editSched(${it.id})">${it.text}</span><button class="del" onclick="deleteSched(${it.id})">✕</button></div>`
+    `<div class="row"><span class="time">${it.time}</span><span style="flex:1;cursor:pointer" onclick="editSched(${it.id})">${it.text}</span>${canManage(it.createdBy)?`<button class="del" onclick="deleteSched(${it.id})">✕</button>`:''}</div>`
   ).join('') : '<div class="small" style="padding:10px 0">등록된 일정이 없어요.</div>';
   renderHomeSchedule();
 }
@@ -514,12 +515,14 @@ async function saveSched(){
     const { error } = await sb.from('schedule_items').update({ time, content:text }).eq('id', editingSchedId);
     if(error){alert('일정 수정 실패: '+error.message);return;}
   }else{
-    const { error } = await sb.from('schedule_items').insert([{ date:selectedDate, time, content:text }]);
+    const { error } = await sb.from('schedule_items').insert([{ date:selectedDate, time, content:text, created_by:currentUser }]);
     if(error){alert('일정 저장 실패: '+error.message);return;}
   }
   initSchedule();
 }
 async function deleteSched(id){
+  const it=(scheduleData[selectedDate]||[]).find(x=>x.id===id);
+  if(it && !canManage(it.createdBy)){ alert('작성자 또는 관리자(아빠)만 삭제할 수 있어요.'); return; }
   const { error } = await sb.from('schedule_items').delete().eq('id', id);
   if(error){alert('삭제 실패: '+error.message);return;}
   initSchedule();
@@ -552,11 +555,13 @@ async function saveNotice(){
   const text=document.getElementById('noticeText').value.trim();
   if(!title||!text)return;
   document.getElementById('noticeForm').style.display='none';
-  const { error } = await sb.from('notices').insert([{ title, content:text, date:todayKey() }]);
+  const { error } = await sb.from('notices').insert([{ title, content:text, date:todayKey(), created_by:currentUser }]);
   if(error){alert('공지 등록 실패: '+error.message);return;}
   initNotice();
 }
 async function deleteNotice(id){
+  const n=noticeData.find(x=>x.id===id);
+  if(n && !canManage(n.created_by)){ alert('작성자 또는 관리자(아빠)만 삭제할 수 있어요.'); return; }
   const { error } = await sb.from('notices').delete().eq('id', id);
   if(error){alert('삭제 실패: '+error.message);return;}
   initNotice();
@@ -566,7 +571,7 @@ function renderNotice(){
   const homeElem = document.getElementById('homeNoticeBody');
   if(!listElem || !homeElem) return;
   listElem.innerHTML=noticeData.length? noticeData.map(n=>
-    `<div class="noticeitem"><div class="top"><span class="datepill">${fmtDate(n.date)}</span><button class="del" onclick="deleteNotice(${n.id})">✕</button></div><b>${n.title}</b><div class="small" style="margin-top:4px">${n.content}</div></div>`
+    `<div class="noticeitem"><div class="top"><span class="datepill">${fmtDate(n.date)}</span>${canManage(n.created_by)?`<button class="del" onclick="deleteNotice(${n.id})">✕</button>`:''}</div><b>${n.title}</b><div class="small" style="margin-top:4px">${n.content}</div></div>`
   ).join('') : '<div class="small">등록된 공지가 없어요.</div>';
   const first=noticeData[0];
   homeElem.innerHTML=first? `<b>${first.title}</b><div class="small" style="margin-top:8px">${first.content}</div>` : '<div class="small">등록된 공지가 없어요.</div>';
@@ -578,7 +583,7 @@ async function initMeal(){
   const { data, error } = await sb.from('meals').select('*');
   if(!error && data){
     mealData = {};
-    data.forEach(row=>{ mealData[row.date] = { menu: row.menu, side: row.side }; });
+    data.forEach(row=>{ mealData[row.date] = { menu: row.menu, side: row.side, createdBy: row.created_by }; });
   }
   renderMeal();
   sb.channel('public:meals')
@@ -590,8 +595,15 @@ async function saveMeal(){
   const side=document.getElementById('mealSide').value.trim();
   if(!menu)return;
   document.getElementById('mealMenu').value='';document.getElementById('mealSide').value='';
-  const { error } = await sb.from('meals').upsert([{ date:todayKey(), menu, side }], { onConflict:'date' });
+  const { error } = await sb.from('meals').upsert([{ date:todayKey(), menu, side, created_by:currentUser }], { onConflict:'date' });
   if(error){alert('식단 저장 실패: '+error.message);return;}
+  initMeal();
+}
+async function deleteMeal(date){
+  const m=mealData[date];
+  if(m && !canManage(m.createdBy)){ alert('작성자 또는 관리자(아빠)만 삭제할 수 있어요.'); return; }
+  const { error } = await sb.from('meals').delete().eq('date', date);
+  if(error){alert('삭제 실패: '+error.message);return;}
   initMeal();
 }
 function renderMeal(){
@@ -600,7 +612,7 @@ function renderMeal(){
   if(!listElem || !homeElem) return;
   const keys=Object.keys(mealData).sort().reverse();
   listElem.innerHTML=keys.length? keys.map(k=>
-    `<div class="mealitem"><span class="datepill">${fmtDate(k)}${k===todayKey()?' · 오늘':''}</span><b style="display:block;margin-top:4px">${mealData[k].menu}</b>${mealData[k].side?`<div class="small">${mealData[k].side}</div>`:''}</div>`
+    `<div class="mealitem"><div class="top"><span class="datepill">${fmtDate(k)}${k===todayKey()?' · 오늘':''}</span>${canManage(mealData[k].createdBy)?`<button class="del" onclick="deleteMeal('${k}')">✕</button>`:''}</div><b style="display:block">${mealData[k].menu}</b>${mealData[k].side?`<div class="small">${mealData[k].side}</div>`:''}</div>`
   ).join('') : '<div class="small">등록된 식단이 없어요.</div>';
   const today=mealData[todayKey()];
   homeElem.innerHTML=today? `<div class="mealpic">🍚 🥘</div><b>${today.menu}</b>${today.side?`<div class="small">${today.side}</div>`:''}` : '<div class="small" style="padding:12px 0">오늘 식단이 없어요. 눌러서 입력하기</div>';
