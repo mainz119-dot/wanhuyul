@@ -91,7 +91,7 @@ textarea.field{resize:vertical;min-height:64px}
 
   <section id="chat" class="page">
     <div class="sectiontitle">가족톡 💬</div>
-    <div class="listitem"><span>👨‍👩‍👦‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">메시지를 불러오는 중...</small></span></div>
+    <div class="listitem"><span>👨‍👩‍👦‍👦 <b>우리 가족</b><br><small id="chatPreview">메시지를 불러오는 중...</small></span></div>
     <div class="card chat dmbody" id="groupMessages"></div>
     <div class="dmbar"><input id="groupInputBox" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendGroup()"><button onclick="sendGroup()">전송</button></div>
   </section>
@@ -304,11 +304,12 @@ function startCall(type){
   alert(`${name}님에게 ${type==='voice'?'음성':'영상'}통화를 겁니다 ${type==='voice'?'📞':'📹'}`);
 }
 
-/* ===== 가족톡 (Supabase Realtime) ===== */
+/* ===== 가족톡 (Supabase Realtime 개선) ===== */
 let groupChat = [];
 
 async function initGroupChat() {
   try {
+    // 1. 기존 메시지 로드
     const { data, error } = await sb
       .from('family_messages')
       .select('*')
@@ -317,16 +318,25 @@ async function initGroupChat() {
     if (!error && data) {
       groupChat = data;
       renderGroup();
+    } else if (error) {
+      console.error('기존 채팅 불러오기 오류:', error);
     }
 
+    // 2. Realtime 채널 등록
     sb.channel('public:family_messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'family_messages' }, payload => {
-        groupChat.push(payload.new);
-        renderGroup();
+        // 이미 들어온 메시지 중복 체크
+        const exists = groupChat.some(m => m.id && m.id === payload.new.id);
+        if (!exists) {
+          groupChat.push(payload.new);
+          renderGroup();
+        }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime 구독 상태:', status);
+      });
   } catch(e) {
-    console.error('채팅 로드 예외:', e);
+    console.error('채팅 연결 예외:', e);
   }
 }
 
@@ -364,12 +374,20 @@ async function sendGroup(){
 
   box.value = '';
 
-  const { error } = await sb
+  const { data, error } = await sb
     .from('family_messages')
-    .insert([{ sender_name: currentUser, content: text }]);
+    .insert([{ sender_name: currentUser, content: text }])
+    .select();
 
   if (error) {
-    alert('메시지 전송 실패: ' + error.message);
+    alert('메시지 전송 실패 (RLS 권한을 확인하세요): ' + error.message);
+  } else if (data && data.length > 0) {
+    // 내가 보낸 메시지는 수신을 안 기다리고 화면에 바로 동기화
+    const exists = groupChat.some(m => m.id === data[0].id);
+    if (!exists) {
+      groupChat.push(data[0]);
+      renderGroup();
+    }
   }
 }
 
