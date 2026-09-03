@@ -35,7 +35,7 @@
 .lightbox .lbbar{position:fixed;top:calc(14px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;padding:0 16px}
 .lightbox .lbbtn{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:14px;padding:11px 14px;font-size:16px;backdrop-filter:blur(6px)}
 .lightbox .lbdel{background:rgba(230,70,70,.75)}
-.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 8px calc(10px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(520px,100%);background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:flex;justify-around:space-around;padding:10px 8px calc(10px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
 .tab{border:0;background:transparent;color:#7b8494;font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px 8px}.tab b{font-size:20px}.tab.active{color:var(--blue);font-weight:800}
 .page{display:none}.page.active{display:block}
 .listitem{background:var(--card);padding:16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
@@ -68,6 +68,7 @@ textarea.field{resize:vertical;min-height:64px}
 .noticeitem .top,.mealitem .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .del{border:0;background:transparent;color:#c8ccd4;font-size:15px;padding:2px 6px}
 .datepill{display:inline-block;font-size:11px;color:var(--sub);background:var(--bg);border-radius:8px;padding:2px 8px;margin-bottom:2px}
+.empty-msg{text-align:center;padding:30px 10px;color:var(--sub);font-size:13px}
 </style>
 </head>
 <body>
@@ -169,6 +170,7 @@ textarea.field{resize:vertical;min-height:64px}
     <div class="card setting"><div class="cardhead">⚙️ 가족 이름 관리</div><div id="nameEditor"></div><button class="save" onclick="saveNames()">변경사항 저장</button></div>
   </section>
 </div>
+
 <div class="overlay" id="personOverlay" onclick="if(event.target===this)closeSheet()">
   <div class="sheet">
     <div class="sheethead"><div class="avatar" id="sheetAvatar"></div><div><b id="sheetName"></b><div class="small" id="sheetPlace"></div></div></div>
@@ -178,6 +180,7 @@ textarea.field{resize:vertical;min-height:64px}
     <button class="sheetbtn cancel" onclick="closeSheet()">취소</button>
   </div>
 </div>
+
 <nav class="nav">
   <button class="tab active" data-page="home"><b>⌂</b>홈</button>
   <button class="tab" data-page="chat"><b>◌</b>가족톡</button>
@@ -185,6 +188,7 @@ textarea.field{resize:vertical;min-height:64px}
   <button class="tab" data-page="map"><b>⌖</b>지도</button>
   <button class="tab" data-page="more"><b>☰</b>더보기</button>
 </nav>
+
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8df232422f24bc7cf58bca2734e9f1e8&autoload=false"></script>
@@ -200,7 +204,7 @@ const icons=['👨','👩','🧒','🧒','🧒'];
 const places=['회사','집','학교','학원','집'];
 let dmData = JSON.parse(localStorage.getItem('woorijipDm')||'{}');
 let activePersonIndex = null;
-const autoReplies=['응 알겠어! 😊','지금 확인해볼게','좋아 조금 이따 얘기하자','ㅋㅋㅋ 그러자','응응 알았어~'];
+
 const pad=n=>String(n).padStart(2,'0');
 const dateKey=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
 const todayKey=()=>{const t=new Date();return dateKey(t.getFullYear(),t.getMonth(),t.getDate());};
@@ -232,14 +236,15 @@ function goToPage(id){
 }
 function goHome(){goToPage('home');}
 
+/* ===== 1:1 DM ===== */
 function openDm(){closeSheet();goToPage('dm');renderDm();}
 function renderDm(){
   const i=activePersonIndex;
   document.getElementById('dmAvatar').textContent=icons[i];
   document.getElementById('dmName').textContent=family[i];
-  if(!dmData[family[i]])dmData[family[i]]=[{me:false,text:'안녕! 👋'}];
+  if(!dmData[family[i]])dmData[family[i]]=[];
   const msgs=dmData[family[i]];
-  document.getElementById('dmMessages').innerHTML=msgs.map(m=>`<div class="bubble${m.me?' me':''}">${m.text}</div>`).join('');
+  document.getElementById('dmMessages').innerHTML=msgs.length ? msgs.map(m=>`<div class="bubble${m.me?' me':''}">${m.text}</div>`).join('') : '<div class="empty-msg">대화 내용이 없습니다. 첫 메시지를 보내보세요!</div>';
   document.getElementById('dmMessages').scrollTop=999999;
 }
 function sendDm(){
@@ -247,15 +252,11 @@ function sendDm(){
   const text=box.value.trim();
   if(!text||activePersonIndex===null)return;
   const name=family[activePersonIndex];
+  if(!dmData[name])dmData[name]=[];
   dmData[name].push({me:true,text});
   box.value='';
   localStorage.setItem('woorijipDm',JSON.stringify(dmData));
   renderDm();
-  setTimeout(()=>{
-    dmData[name].push({me:false,text:autoReplies[Math.floor(Math.random()*autoReplies.length)]});
-    localStorage.setItem('woorijipDm',JSON.stringify(dmData));
-    if(activePersonIndex!==null&&family[activePersonIndex]===name)renderDm();
-  },700);
 }
 function startCall(type){
   const name=family[activePersonIndex];
@@ -263,11 +264,10 @@ function startCall(type){
   alert(`${name}님에게 ${type==='voice'?'음성':'영상'}통화를 겁니다 ${type==='voice'?'📞':'📹'}`);
 }
 
-/* ===== 가족톡 (Supabase Realtime 연동) ===== */
+/* ===== 가족톡 (Supabase Realtime) ===== */
 let groupChat = [];
-const currentUser = family[0] || '아빠'; // 현재 기기의 기본 발신자 이름
+const currentUser = family[0] || '아빠';
 
-// 1. Supabase에서 기존 메시지 목록 불러오기 및 실시간 구독
 async function initGroupChat() {
   const { data, error } = await sb
     .from('family_messages')
@@ -282,7 +282,6 @@ async function initGroupChat() {
   groupChat = data || [];
   renderGroup();
 
-  // Supabase Realtime 구독 설정
   sb.channel('public:family_messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'family_messages' }, payload => {
       groupChat.push(payload.new);
@@ -291,18 +290,17 @@ async function initGroupChat() {
     .subscribe();
 }
 
-// 2. 메시지 화면 렌더링
 function renderGroup(){
   const msgContainer = document.getElementById('groupMessages');
   if(!msgContainer) return;
 
-  msgContainer.innerHTML = groupChat.map(m => {
+  msgContainer.innerHTML = groupChat.length ? groupChat.map(m => {
     const isMe = m.sender_name === currentUser;
     return `<div class="bubble${isMe ? ' me' : ''}">
       ${isMe ? '' : `<b style="display:block;font-size:11px;color:var(--sub);margin-bottom:2px">${m.sender_name}</b>`}
       ${m.content}
     </div>`;
-  }).join('');
+  }).join('') : '<div class="empty-msg">가족들과 나눈 대화가 없습니다.</div>';
 
   msgContainer.scrollTop = 999999;
 
@@ -315,7 +313,6 @@ function renderGroup(){
   }
 }
 
-// 3. 메시지 전송 (Supabase DB 저장)
 async function sendGroup(){
   const box = document.getElementById('groupInputBox');
   const text = box.value.trim();
@@ -333,14 +330,7 @@ async function sendGroup(){
 }
 
 /* ===== 일정 ===== */
-let scheduleData = JSON.parse(localStorage.getItem('woorijipSchedule')||'null') || {};
-if(!scheduleData[todayKey()]){
-  scheduleData[todayKey()]=[
-    {id:1,time:'15:00',text:'🏥 병원 예약'},
-    {id:2,time:'17:00',text:'🎒 학원'},
-    {id:3,time:'19:00',text:'🍽️ 가족 저녁식사'}
-  ];
-}
+let scheduleData = JSON.parse(localStorage.getItem('woorijipSchedule')||'{}');
 let calDate = new Date();
 let selectedDate = todayKey();
 let editingSchedId = null;
@@ -413,9 +403,7 @@ function renderHomeSchedule(){
 }
 
 /* ===== 공지사항 ===== */
-let noticeData = JSON.parse(localStorage.getItem('woorijipNotice')||'null') || [
-  {id:1,title:'이번 주 토요일',text:'할머니 댁 방문합니다.',date:todayKey()}
-];
+let noticeData = JSON.parse(localStorage.getItem('woorijipNotice')||'[]');
 function toggleNoticeForm(){
   document.getElementById('noticeTitle').value='';
   document.getElementById('noticeText').value='';
@@ -445,7 +433,7 @@ function renderNotice(){
 }
 
 /* ===== 식단 ===== */
-let mealData = JSON.parse(localStorage.getItem('woorijipMeal')||'null') || {[todayKey()]:{menu:'불고기',side:'된장국 · 시금치'}};
+let mealData = JSON.parse(localStorage.getItem('woorijipMeal')||'{}');
 function saveMeal(){
   const menu=document.getElementById('mealMenu').value.trim();
   const side=document.getElementById('mealSide').value.trim();
@@ -464,7 +452,7 @@ function renderMeal(){
   document.getElementById('homeMealBody').innerHTML=today? `<div class="mealpic">🍚 🥘</div><b>${today.menu}</b>${today.side?`<div class="small">${today.side}</div>`:''}` : '<div class="small" style="padding:12px 0">오늘 식단이 없어요. 눌러서 입력하기</div>';
 }
 
-/* ===== 가족 앨범 (Supabase Storage) ===== */
+/* ===== 가족 앨범 ===== */
 let photoList=[];
 let currentPhotoIdx=null;
 async function uploadPhoto(file){
@@ -472,13 +460,13 @@ async function uploadPhoto(file){
   const path=`${Date.now()}_${file.name}`;
   const {error}=await sb.storage.from(PHOTO_BUCKET).upload(path,file);
   document.getElementById('photoInput').value='';
-  if(error){alert('업로드 실패: '+error.message+'\n(Supabase Storage 버킷/정책 설정을 확인해주세요)');return;}
+  if(error){alert('업로드 실패: '+error.message);return;}
   loadPhotos();
 }
 async function loadPhotos(){
   const {data,error}=await sb.storage.from(PHOTO_BUCKET).list('',{limit:100,sortBy:{column:'created_at',order:'desc'}});
   if(error){
-    document.getElementById('albumGrid').innerHTML=`<div class="small">사진을 불러오지 못했어요 (${error.message})</div>`;
+    document.getElementById('albumGrid').innerHTML=`<div class="small">사진을 불러오지 못했어요</div>`;
     return;
   }
   photoList=(data||[]).filter(f=>f.name).map(f=>({name:f.name,url:sb.storage.from(PHOTO_BUCKET).getPublicUrl(f.name).data.publicUrl}));
@@ -501,7 +489,7 @@ async function deleteCurrentPhoto(){
   loadPhotos();
 }
 
-/* ===== 가족 지도 (카카오맵) ===== */
+/* ===== 카카오맵 ===== */
 let kakaoMap=null;
 const familySpots=[
   {icon:'👨',name:'아빠',place:'회사',lat:37.2058,lng:127.0798},
