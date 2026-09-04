@@ -1,0 +1,6357 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>완후율</title>
+
+<link rel="manifest" href="./manifest.json">
+
+<meta name="theme-color" content="#2f6fed">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="완후율">
+
+<link rel="apple-touch-icon" href="./icon-192.png">
+
+<style>
+:root{
+  --bg:#f5f7fb; --card:#ffffff; --text:#202124; --sub:#6b7280;
+  --blue:#2f6fed; --line:#e8ebf1; --shadow:0 6px 20px rgba(30,45,70,.08);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;
+  color:var(--text)
+}
+.app{
+  max-width:520px;
+  margin:0 auto;
+  min-height:100vh;
+  padding:18px 16px 92px;
+  position:relative
+}
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin:8px 0 18px
+}
+.title{
+  font-size:29px;
+  font-weight:800
+}
+.sub{
+  font-size:13px;
+  color:var(--sub);
+  margin-top:4px
+}
+.iconbtn{
+  border:0;
+  background:var(--card);
+  border-radius:14px;
+  padding:11px;
+  box-shadow:var(--shadow);
+  font-size:18px
+}
+.family{
+  display:flex;
+  justify-content:space-between;
+  gap:7px;
+  margin-bottom:18px;
+  min-height:70px
+}
+.person{
+  text-align:center;
+  min-width:0;
+  flex:1;
+  cursor:pointer;
+  position:relative
+}
+.avatar{
+  width:52px;
+  height:52px;
+  margin:auto;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(145deg,#e7eefc,#fff);
+  border:1px solid var(--line);
+  font-size:24px;
+  position:relative
+}
+.dot{
+  width:10px;
+  height:10px;
+  background:#29b765;
+  border:2px solid white;
+  border-radius:50%;
+  position:relative;
+  left:34px;
+  top:-10px;
+  margin-bottom:-10px
+}
+.badge{
+  position:absolute;
+  top:-2px;
+  right:-2px;
+  background:#ff3b30;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  border-radius:10px;
+  padding:2px 6px;
+  border:2px solid #fff;
+  display:none;
+  z-index:5
+}
+.badge.show{
+  display:inline-block
+}
+.name{
+  font-weight:700;
+  font-size:13px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.place{
+  font-size:11px;
+  color:var(--sub);
+  margin-top:3px
+}
+.grid{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:12px
+}
+.full{
+  grid-column:1/-1
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:16px;
+  box-shadow:var(--shadow)
+}
+.cardhead{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-weight:800;
+  margin-bottom:12px
+}
+.more{
+  font-size:12px;
+  color:var(--sub)
+}
+.row{
+  display:flex;
+  gap:10px;
+  padding:9px 0;
+  border-top:1px solid #f0f2f6;
+  font-size:13px
+}
+.row:first-of-type{
+  border-top:0
+}
+.time{
+  color:var(--blue);
+  font-weight:700;
+  min-width:42px
+}
+.mealpic{
+  height:76px;
+  border-radius:15px;
+  background:linear-gradient(135deg,#ffe8bd,#fff3dc);
+  display:grid;
+  place-items:center;
+  font-size:36px;
+  margin-bottom:8px
+}
+.small{
+  font-size:12px;
+  color:var(--sub)
+}
+.notice{
+  background:linear-gradient(135deg,#f7fbff,#fff);
+  min-height:108px
+}
+.photos{
+  display:flex;
+  gap:7px
+}
+.photo{
+  height:54px;
+  flex:1;
+  border-radius:11px;
+  background:linear-gradient(135deg,#b7d5f6,#f5c9d2);
+  background-size:cover;
+  background-position:center
+}
+.albumgrid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px
+}
+.albumgrid .photo{
+  height:0;
+  padding-top:100%;
+  position:relative;
+  cursor:pointer
+}
+.lightbox{
+  position:fixed;
+  inset:0;
+  background:rgba(10,12,20,.92);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:70;
+  flex-direction:column
+}
+.lightbox.show{
+  display:flex
+}
+.lightbox img{
+  max-width:92vw;
+  max-height:80vh;
+  border-radius:16px;
+  object-fit:contain
+}
+.lightbox .lbbar{
+  position:fixed;
+  top:calc(14px + env(safe-area-inset-top));
+  left:0;
+  right:0;
+  display:flex;
+  justify-content:space-between;
+  padding:0 16px
+}
+.lightbox .lbbtn{
+  border:0;
+  background:rgba(255,255,255,.15);
+  color:#fff;
+  border-radius:14px;
+  padding:11px 14px;
+  font-size:16px;
+  backdrop-filter:blur(6px)
+}
+.lightbox .lbdel{
+  background:rgba(230,70,70,.75)
+}
+.nav{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:0;
+  width:min(520px,100%);
+  background:rgba(255,255,255,.96);
+  border-top:1px solid var(--line);
+  display:flex;
+  justify-around:space-around;
+  padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+  backdrop-filter:blur(10px)
+}
+.tab{
+  border:0;
+  background:transparent;
+  color:#7b8494;
+  font-size:11px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  align-items:center;
+  padding:5px 8px
+}
+.tab b{
+  font-size:20px
+}
+.tab.active{
+  color:var(--blue);
+  font-weight:800
+}
+.page{
+  display:none
+}
+.page.active{
+  display:block
+}
+.listitem{
+  background:var(--card);
+  padding:16px;
+  border-radius:18px;
+  margin-bottom:10px;
+  border:1px solid var(--line);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:var(--shadow)
+}
+.chat{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:460px;
+  overflow-y:auto;
+  padding:12px
+}
+.bubble{
+  max-width:78%;
+  padding:12px 14px;
+  border-radius:18px;
+  background:#fff;
+  border:1px solid var(--line);
+  align-self:flex-start;
+  word-break:break-all
+}
+.bubble.me{
+  background:#eaf1ff;
+  align-self:flex-end;
+  border-color:#d7e5ff
+}
+.chat-img{
+  max-width:100%;
+  max-height:220px;
+  border-radius:12px;
+  margin-top:4px;
+  display:block;
+  cursor:pointer
+}
+.map{
+  height:350px;
+  border-radius:24px;
+  background:linear-gradient(135deg,#d8eee7,#eaf3e5 48%,#d5e6f6);
+  position:relative;
+  overflow:hidden
+}
+.calendar{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:7px;
+  text-align:center
+}
+.day{
+  padding:10px 0;
+  border-radius:12px;
+  font-size:13px;
+  cursor:pointer;
+  position:relative
+}
+.today{
+  background:var(--blue);
+  color:white;
+  font-weight:800
+}
+.day.selected:not(.today){
+  background:#eaf1ff;
+  color:var(--blue);
+  font-weight:800
+}
+.day.has::after{
+  content:'';
+  position:absolute;
+  bottom:3px;
+  left:50%;
+  transform:translateX(-50%);
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--blue)
+}
+.today.has::after{
+  background:#fff
+}
+.setting input{
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:10px;
+  width:100%;
+  font-size:15px
+}
+.save{
+  width:100%;
+  border:0;
+  background:var(--blue);
+  color:#fff;
+  padding:14px;
+  border-radius:14px;
+  font-weight:800;
+  margin-top:12px
+}
+.sectiontitle{
+  font-size:23px;
+  font-weight:800;
+  margin:8px 0 16px
+}
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(20,25,40,.45);
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  z-index:60
+}
+.overlay.show{
+  display:flex
+}
+.sheet{
+  width:min(520px,100%);
+  background:#fff;
+  border-radius:26px 26px 0 0;
+  padding:22px 18px calc(22px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 30px rgba(20,25,40,.18)
+}
+.sheethead{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:16px
+}
+.sheethead .avatar{
+  width:44px;
+  height:44px;
+  font-size:20px
+}
+.sheetbtn{
+  width:100%;
+  border:0;
+  background:var(--bg);
+  border-radius:16px;
+  padding:14px 16px;
+  font-size:15px;
+  font-weight:700;
+  text-align:left;
+  margin-bottom:9px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  position:relative
+}
+.sheetbtn.cancel{
+  background:transparent;
+  color:var(--sub);
+  justify-content:center;
+  font-weight:600;
+  margin-top:4px;
+  margin-bottom:0
+}
+.dmheader{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:14px
+}
+.dmheader .avatar{
+  width:40px;
+  height:40px;
+  font-size:18px
+}
+.dmheader .calls{
+  margin-left:auto;
+  font-size:18px;
+  letter-spacing:6px
+}
+.dmbody{
+  min-height:340px;
+  justify-content:flex-end
+}
+.dmbar{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+  position:sticky;
+  bottom:8px;
+  align-items:center
+}
+.dmbar input[type="text"]{
+  flex:1;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:12px 14px;
+  font-size:14px
+}
+.dmbar button{
+  border:0;
+  background:var(--blue);
+  color:#fff;
+  border-radius:14px;
+  padding:12px 18px;
+  font-weight:800;
+  white-space:nowrap
+}
+.file-btn{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:18px;
+  cursor:pointer;
+  display:grid;
+  place-items:center
+}
+.field{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:11px;
+  font-size:14px;
+  margin-top:8px;
+  font-family:inherit
+}
+textarea.field{
+  resize:vertical;
+  min-height:64px
+}
+.noticeitem,
+.mealitem{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow)
+}
+.noticeitem .top,
+.mealitem .top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:4px
+}
+.del{
+  border:0;
+  background:transparent;
+  color:#c8ccd4;
+  font-size:15px;
+  padding:2px 6px
+}
+.datepill{
+  display:inline-block;
+  font-size:11px;
+  color:var(--sub);
+  background:var(--bg);
+  border-radius:8px;
+  padding:2px 8px;
+  margin-bottom:2px
+}
+.empty-msg{
+  text-align:center;
+  padding:30px 10px;
+  color:var(--sub);
+  font-size:13px
+}
+.user-select{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:6px 10px;
+  font-size:13px;
+  font-weight:700;
+  color:var(--blue)
+}
+.toast{
+  position:fixed;
+  top:16px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#202124;
+  color:#fff;
+  padding:12px 20px;
+  border-radius:16px;
+  font-size:13px;
+  font-weight:700;
+  box-shadow:0 8px 24px rgba(0,0,0,.2);
+  display:none;
+  z-index:100;
+  align-items:center;
+  gap:8px
+}
+.toast.show{
+  display:flex
+}
+
+.resource-upload{
+  display:flex;gap:8px;align-items:center;margin-top:10px
+}
+.resource-upload input[type=file]{flex:1;font-size:12px}
+.resource-link{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 0;border-top:1px solid #f0f2f6
+}
+.resource-link:first-child{border-top:0}
+.resource-icon{font-size:25px}
+.resource-info{flex:1;min-width:0}
+.resource-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resource-meta{font-size:11px;color:var(--sub);margin-top:3px}
+.resource-actions{display:flex;gap:5px}
+.resource-actions a,.resource-actions button{
+  border:0;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:12px;text-decoration:none;color:var(--text)
+}
+.anniv-card{display:flex;align-items:center;gap:12px}
+.anniv-date{width:58px;text-align:center;border-radius:14px;background:#fff0f3;padding:8px 4px;color:#d94b67}
+.anniv-date b{display:block;font-size:18px}
+.anniv-date span{font-size:10px}
+.reminder-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--sub)}
+.reminder-row select{border:1px solid var(--line);border-radius:10px;padding:7px;background:#fff}
+
+
+/* ===== 프로필 사진 관리 ===== */
+.profile-manager{margin-top:14px}
+.member-editor{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #f0f2f6}
+.member-editor:first-child{border-top:0}
+.member-avatar-wrap{position:relative;flex:0 0 auto}
+.member-avatar-img{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 3px 12px rgba(30,45,70,.12);background:#eef4fb}
+.member-camera{position:absolute;right:-3px;bottom:-3px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:#2f80ed;color:#fff;font-size:11px;display:grid;place-items:center}
+.member-info{flex:1;min-width:0}
+.member-name-input{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:13px}
+.member-actions{display:flex;gap:5px;align-items:center}
+.member-actions label{border:0;background:#f4f7fb;border-radius:10px;padding:8px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+.member-actions input{display:none}
+.avatar-img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.avatar-img-marker{width:38px;height:38px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);background:#fff}
+
+/* ===== 완후율 6.0 가족사진 배경 + 대시보드 홈 ===== */
+:root{
+  --bg:#f4f9fd;
+  --card:#ffffff;
+  --text:#172033;
+  --sub:#7b8798;
+  --blue:#2f80ed;
+  --line:#e8eef5;
+  --shadow:0 10px 30px rgba(43,78,111,.09);
+  --radius:24px;
+}
+body{background:#f4f9fd;overflow-x:hidden}
+.app{max-width:920px;padding:0 22px calc(118px + env(safe-area-inset-bottom))}
+.page{padding-bottom:18px}
+#home{position:relative;margin:0 -22px;padding:20px 22px 28px;min-height:calc(100dvh - 96px);overflow:visible;background:linear-gradient(180deg,#eef8ff 0%,#f8fbfe 52%,#fff 100%)}
+#home:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 12% 10%,rgba(255,255,255,.82),transparent 25%),radial-gradient(circle at 80% 40%,rgba(214,240,255,.35),transparent 30%)}
+.home-header{position:relative;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 auto 8px;max-width:876px}
+.brand-block .title{font-size:34px;line-height:1.05;letter-spacing:-1.5px;font-weight:900;color:#111827}.brand-house{font-size:30px;vertical-align:2px}.brand-block .sub{font-size:14px;margin-top:8px;color:#738197}.home-date{font-size:13px;font-weight:700;color:#27364a;margin-top:7px}.header-actions{display:flex;gap:10px}.round-action{width:46px;height:46px;border:1px solid rgba(255,255,255,.95);background:rgba(255,255,255,.9);color:#172033;border-radius:50%;box-shadow:0 7px 22px rgba(43,78,111,.12);font-size:21px;cursor:pointer;position:relative;backdrop-filter:blur(10px)}
+.action-badge{position:absolute;top:4px;right:5px;width:9px;height:9px;border-radius:50%;background:#ef4444;display:none}.action-badge.show{display:block}
+.home-mode-switch{position:relative;z-index:3;display:flex;justify-content:flex-end;gap:8px;max-width:876px;margin:0 auto 8px}.mode-btn{border:1px solid #dfe8f1;background:rgba(255,255,255,.82);color:#69778a;border-radius:16px;padding:9px 13px;font-weight:800;cursor:pointer;box-shadow:0 5px 16px rgba(43,78,111,.05)}.mode-btn.active{border-color:#68a7f7;color:#1670dc;background:#eef7ff}
+.current-user-strip{position:relative;z-index:3;max-width:876px;margin:0 auto 10px;display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:11px;color:#7b8798}.current-user-strip .user-select{background:rgba(255,255,255,.9);border:1px solid rgba(224,233,242,.95);box-shadow:0 5px 16px rgba(43,78,111,.06);border-radius:14px;padding:8px 12px}
+.background-home{position:relative;z-index:2;display:none;max-width:876px;margin:0 auto;min-height:calc(100dvh - 235px);border-radius:32px;overflow:hidden;background-image:url('./family-photo.jpg');background-size:cover;background-position:center center;box-shadow:0 18px 50px rgba(29,61,89,.2);border:1px solid rgba(255,255,255,.9)}.background-home.show{display:block}.background-gradient{position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,43,74,.18) 0%,transparent 38%,rgba(12,28,44,.05) 56%,rgba(12,26,40,.58) 100%)}.background-top-family{position:absolute;top:18px;left:18px;right:18px;display:flex;justify-content:center;gap:12px;z-index:2}.background-top-family .person{color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.35)}.background-top-family .avatar{background:rgba(255,255,255,.88)}.background-copy{position:absolute;z-index:3;left:24px;bottom:26px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.35)}.background-copy strong{display:block;font-size:29px;letter-spacing:-1px}.background-copy span{display:block;margin-top:4px;font-size:14px}.background-notice{position:absolute;z-index:4;left:16px;right:16px;bottom:82px;border-radius:18px;padding:12px 14px;background:rgba(255,255,255,.86);backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.12);cursor:pointer}.background-notice .cardhead{font-size:14px}.background-notice .more{float:right}.background-notice .small{margin-top:6px}
+.dashboard-home{display:block;position:relative;z-index:2;max-width:876px;margin:0 auto}.dashboard-home.hide{display:none}.dashboard-family-card,.dashboard-location-card,.dashboard-grid .card{border:1px solid rgba(225,234,242,.9);border-radius:22px;padding:16px;box-shadow:0 9px 28px rgba(43,78,111,.08);background:rgba(255,255,255,.94);backdrop-filter:blur(8px)}.dashboard-family-card{margin-bottom:12px}.dashboard-family{display:flex;gap:12px;overflow-x:auto;padding:8px 3px 3px}.dashboard-family .person{flex:0 0 86px;text-align:center}.dashboard-family .avatar{width:58px;height:58px;font-size:26px;margin:auto}.dashboard-family .dot{left:calc(50% + 15px);top:-10px}.dashboard-location-card{margin-bottom:12px}.location-mini-map{height:155px;border-radius:18px;background:linear-gradient(145deg,#eef7ff,#f8fbff);overflow:hidden;position:relative}.location-map-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#8b97a7;font-size:12px}.home-location-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:9px}.home-location-item{display:flex;align-items:center;gap:7px;padding:8px 9px;border-radius:12px;background:#f7fafc;font-size:11px}.home-location-item .status-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}.home-location-item .status-dot.online{background:#22c55e}.home-location-item .status-dot.moving{background:#f59e0b}.home-location-item .status-dot.offline{background:#9ca3af}.home-location-item .loc-name{font-weight:800}.home-location-item .loc-time{margin-left:auto;color:#8a95a5}.dashboard-grid{display:grid;grid-template-columns:1fr 1fr 1.08fr;gap:12px}.dashboard-grid .card{min-height:145px}.dashboard-grid .cardhead{font-size:15px}.dashboard-grid .more{font-weight:700;color:#8a96a6;cursor:pointer}.dashboard-grid .row{padding:8px 0}.dashboard-grid .time{color:#3481e9}.dashboard-grid .notice{min-height:145px}.dashboard-grid .photos{gap:8px}.dashboard-grid .photo{height:70px;border-radius:13px}.card-caption{color:#8b95a4;font-size:11px;text-align:center;margin-top:11px}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(920px,100%);z-index:100;background:rgba(255,255,255,.97);border-top:1px solid rgba(220,230,239,.9);box-shadow:0 -5px 22px rgba(43,78,111,.09);padding:8px 8px calc(8px + env(safe-area-inset-bottom));backdrop-filter:blur(12px)}.tab{min-width:70px;padding:7px 10px;font-size:11px}.tab b{font-size:21px}.backbtn{border:0;background:#eef5fb;color:#4c6178;border-radius:12px;padding:7px 10px;font-weight:800;cursor:pointer}
+@media(max-width:720px){
+  .app{max-width:560px;padding-left:14px;padding-right:14px;padding-bottom:calc(116px + env(safe-area-inset-bottom))}
+  #home{margin:0 -14px;padding-left:14px;padding-right:14px;min-height:calc(100dvh - 92px)}
+  .home-header,.home-mode-switch,.current-user-strip,.background-home,.dashboard-home{max-width:100%}
+  .brand-block .title{font-size:29px}.round-action{width:42px;height:42px;font-size:19px}
+  .home-mode-switch{justify-content:flex-start;overflow-x:auto}.mode-btn{white-space:nowrap;font-size:11px;padding:8px 10px}
+  .background-home{min-height:calc(100dvh - 215px);border-radius:26px;background-position:center center}.background-top-family{gap:4px;top:12px}.background-top-family .person{flex:1 1 0}.background-top-family .avatar{width:49px;height:49px;font-size:22px}.background-top-family .name{font-size:10px}.background-top-family .place{font-size:9px}.background-copy{left:18px;bottom:24px}.background-copy strong{font-size:24px}.background-copy span{font-size:12px}.background-notice{bottom:72px;left:10px;right:10px}
+  .dashboard-grid{grid-template-columns:1fr 1fr;gap:10px}.dashboard-grid .card{padding:13px;min-height:132px}.dashboard-grid .photo{height:58px}.dashboard-location-card{padding:13px}.location-mini-map{height:135px}.home-location-list{grid-template-columns:1fr 1fr}.dashboard-family{gap:7px}.dashboard-family .person{flex-basis:72px}.dashboard-family .avatar{width:52px;height:52px;font-size:23px}
+  .nav{width:100%;padding-left:3px;padding-right:3px}.tab{min-width:0;flex:1;padding:7px 3px}.tab b{font-size:20px}
+}
+@media(max-width:390px){.brand-block .title{font-size:26px}.background-home{min-height:calc(100dvh - 208px)}.background-top-family .avatar{width:44px;height:44px;font-size:20px}.dashboard-grid{gap:8px}.dashboard-grid .card{padding:11px;border-radius:18px}.location-mini-map{height:120px}}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div id="toast" class="toast">
+    💬 <span id="toastMsg">메시지가 도착했습니다.</span>
+  </div>
+
+  <section id="home" class="page active">
+
+    <div class="home-header">
+      <div class="brand-block">
+        <div class="title">완후율 <span class="brand-house">🏠</span></div>
+        <div class="sub">우리 가족의 오늘을 한눈에</div>
+        <div class="home-date" id="homeDateLabel"></div>
+      </div>
+      <div class="header-actions">
+        <button class="round-action" onclick="showHomeNotifications()" aria-label="알림">🔔<span id="homeNoticeBadge" class="action-badge"></span></button>
+        <button class="round-action" onclick="goToPage('more')" aria-label="설정">⚙</button>
+      </div>
+    </div>
+
+    <div class="home-mode-switch" role="group" aria-label="홈 화면 모드">
+      <button id="backgroundModeBtn" class="mode-btn" onclick="setHomeMode('background')">🖼️ 배경화면 모드</button>
+      <button id="dashboardModeBtn" class="mode-btn" onclick="setHomeMode('dashboard')">▦ 대시보드 모드</button>
+    </div>
+
+    <div class="current-user-strip">
+      <span>현재 사용자</span>
+      <select id="userSelector" class="user-select" onchange="changeCurrentUser(this.value)"></select>
+    </div>
+
+    <!-- 가족사진을 앱의 메인 배경으로 사용하는 모드 -->
+    <div id="backgroundHome" class="background-home">
+      <div class="background-top-family" id="backgroundFamily"></div>
+      <div class="background-gradient"></div>
+      <div class="background-copy">
+        <strong>우리 가족</strong>
+        <span>함께라서 더 행복한 하루 ♥</span>
+      </div>
+
+      <div class="background-notice" onclick="goToPage('notice')">
+        <div class="cardhead">📢 새로운 공지 <span class="more">더보기 ›</span></div>
+        <div id="backgroundNoticeBody"></div>
+      </div>
+    </div>
+
+    <!-- 정보 확인이 편한 대시보드 모드 -->
+    <div id="dashboardHome" class="dashboard-home">
+      <div class="dashboard-family-card card">
+        <div class="cardhead">👨‍👩‍👧‍👦 가족 구성원 <span class="more" onclick="goToPage('more')">관리 ›</span></div>
+        <div class="dashboard-family" id="familyHome"></div>
+      </div>
+
+      <div class="dashboard-location-card card">
+        <div class="cardhead">📍 가족 위치 <span class="more" onclick="goToPage('map')">모두 보기 ›</span></div>
+        <div class="location-mini-map" id="homeLocationMap">
+          <div class="location-map-placeholder">가족 위치를 불러오는 중...</div>
+        </div>
+        <div id="homeLocationBody" class="home-location-list"></div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="cardhead">📅 오늘 일정 <span class="more" onclick="goToPage('schedule')">더보기 ›</span></div>
+          <div id="homeSchedList"></div>
+        </div>
+        <div class="card" id="homeMealCard" onclick="goToPage('meal')" style="cursor:pointer">
+          <div class="cardhead">🍱 오늘 메뉴 <span class="more">더보기 ›</span></div>
+          <div id="homeMealBody"></div>
+        </div>
+        <div class="card notice">
+          <div class="cardhead">📢 새로운 공지 <span class="more" onclick="goToPage('notice')">더보기 ›</span></div>
+          <div id="homeNoticeBody"></div>
+        </div>
+        <div class="card">
+          <div class="cardhead">📸 최근 사진 <span class="more" onclick="goToPage('album')">더보기 ›</span></div>
+          <div class="photos" id="homePhotos"></div>
+          <div class="card-caption">행복한 순간들을 함께 남겨요</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <section id="chat" class="page">
+
+    <div class="sectiontitle">
+      가족톡 💬
+    </div>
+
+    <div class="listitem">
+
+      <span>
+        👨‍👩‍👦‍👦
+        <b>우리 가족</b>
+
+        <br>
+
+        <small id="chatPreview">
+          메시지를 불러오는 중...
+        </small>
+
+      </span>
+
+    </div>
+
+    <div
+      class="card chat dmbody"
+      id="groupMessages">
+    </div>
+
+    <div class="dmbar">
+
+      <label
+        class="file-btn"
+        title="사진 공유">
+
+        📷
+
+        <input
+          type="file"
+          accept="image/*"
+          style="display:none"
+          onchange="uploadChatPhoto(this.files[0], 'group')">
+
+      </label>
+
+      <input
+        id="groupInputBox"
+        type="text"
+        placeholder="메시지 입력..."
+        onkeydown="if(event.key==='Enter')sendGroup()">
+
+      <button onclick="sendGroup()">
+        전송
+      </button>
+
+    </div>
+
+  </section>
+
+
+  <section id="schedule" class="page">
+
+    <div
+      class="sectiontitle"
+      id="calTitle">
+      2026년 9월 📅
+    </div>
+
+    <div class="card">
+      <div
+        class="calendar"
+        id="calGrid">
+      </div>
+    </div>
+
+    <div
+      class="card"
+      style="margin-top:14px">
+
+      <div class="cardhead">
+
+        <span id="schedDateLabel">
+          오늘 일정
+        </span>
+
+        <span
+          class="more"
+          onclick="toggleSchedForm()">
+          + 추가
+        </span>
+
+      </div>
+
+      <div id="schedList"></div>
+
+      <div
+        id="schedForm"
+        style="display:none">
+
+        <input
+          id="schedTime"
+          class="field"
+          type="time">
+
+        <input
+          id="schedText"
+          class="field"
+          placeholder="일정 내용 (예: 🏥 병원 예약)">
+
+        <div class="reminder-row">
+          🔔 알림
+          <select id="schedReminder">
+            <option value="0">알림 없음</option>
+            <option value="10">10분 전</option>
+            <option value="30">30분 전</option>
+            <option value="60">1시간 전</option>
+            <option value="1440">하루 전</option>
+          </select>
+          <span>※ 지금은 알림 설정만 저장합니다. 실제 푸시는 APK 단계에서 연결합니다.</span>
+        </div>
+
+        <button
+          class="save"
+          onclick="saveSched()">
+          저장
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <section id="resources" class="page">
+
+    <div class="sectiontitle" style="display:flex;align-items:center;gap:8px"><button class="backbtn" onclick="goToPage('more')">‹ 뒤로</button><span>자료실 📁</span></div>
+
+    <div class="card">
+      <div class="cardhead">
+        가족 자료
+        <span class="small">사진·PDF·문서</span>
+      </div>
+
+      <div id="resourceList">
+        <div class="empty-msg">자료를 불러오는 중...</div>
+      </div>
+
+      <div id="resourceUploadBox" style="display:none">
+        <div class="small" style="margin-top:8px">관리자(아빠)는 가족이 함께 볼 파일을 올릴 수 있어요.</div>
+        <div class="resource-upload">
+          <input id="resourceFile" type="file">
+          <button class="save" style="width:auto;margin-top:0" onclick="uploadResource()">업로드</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+
+  <section id="anniversary" class="page">
+
+    <div class="sectiontitle" style="display:flex;align-items:center;gap:8px"><button class="backbtn" onclick="goToPage('more')">‹ 뒤로</button><span>가족 기념일 🎂</span></div>
+
+    <div class="card">
+      <div class="cardhead">
+        기념일
+        <span class="small">매년 자동 반복</span>
+      </div>
+
+      <div id="anniversaryList"></div>
+
+      <div id="anniversaryForm" style="display:none">
+        <select id="annivType" class="field">
+          <option value="🎂 생일">🎂 생일</option>
+          <option value="💍 결혼기념일">💍 결혼기념일</option>
+          <option value="🎉 가족 기념일">🎉 가족 기념일</option>
+          <option value="⭐ 기타">⭐ 기타</option>
+        </select>
+        <input id="annivName" class="field" placeholder="이름 또는 기념일 이름">
+        <input id="annivDate" class="field" type="date">
+        <button class="save" onclick="saveAnniversary()">저장</button>
+      </div>
+
+      <button id="annivAddBtn" class="save" onclick="toggleAnniversaryForm()">+ 기념일 추가</button>
+    </div>
+
+  </section>
+
+
+  <section id="map" class="page">
+
+    <div class="sectiontitle">
+      가족 지도 📍
+    </div>
+
+    <div
+      id="kakaoMap"
+      class="map">
+    </div>
+
+
+    <div
+      class="card"
+      style="margin-top:12px">
+
+      <div class="cardhead">
+
+        <span>
+          📡 내 위치 공유
+        </span>
+
+        <span
+          id="locationStatus"
+          class="small">
+
+          ⚪ 공유 중지
+
+        </span>
+
+      </div>
+
+
+      <div
+        class="small"
+        style="margin-bottom:4px">
+
+        현재 선택된 사용자:
+        <b id="locationUserName"></b>
+
+      </div>
+
+
+      <div
+        id="locationMeta"
+        class="small"
+        style="margin-bottom:12px; color:var(--sub)">
+
+        마지막 위치 업데이트: 정보 없음
+
+      </div>
+
+
+      <button
+        id="locationShareBtn"
+        class="save"
+        onclick="toggleLocationSharing()"
+        style="margin-top:0">
+
+        내 위치 공유 시작
+
+      </button>
+
+
+      <div
+        class="small"
+        style="margin-top:10px">
+
+        위치 공유를 켜두면
+        앱을 다시 열었을 때도
+        자동으로 이어서 공유됩니다.
+
+      </div>
+
+    </div>
+
+
+    <div
+      id="locationList"
+      style="margin-top:12px">
+    </div>
+
+  </section>
+
+
+  <section id="notice" class="page">
+
+    <div class="dmheader">
+
+      <button
+        class="iconbtn"
+        onclick="goHome()">
+
+        ←
+
+      </button>
+
+      <b style="font-size:19px">
+        공지사항 📢
+      </b>
+
+      <span
+        class="calls"
+        style="margin-left:auto;letter-spacing:0"
+        onclick="toggleNoticeForm()">
+
+        <span class="more">
+          + 새 공지
+        </span>
+
+      </span>
+
+    </div>
+
+
+    <div
+      class="card"
+      id="noticeForm"
+      style="display:none;margin-bottom:14px">
+
+      <input
+        id="noticeTitle"
+        class="field"
+        placeholder="제목 (예: 이번 주 토요일)">
+
+      <textarea
+        id="noticeText"
+        class="field"
+        placeholder="내용을 입력하세요">
+      </textarea>
+
+      <button
+        class="save"
+        onclick="saveNotice()">
+
+        등록
+
+      </button>
+
+    </div>
+
+
+    <div id="noticeList"></div>
+
+  </section>
+
+
+  <section id="meal" class="page">
+
+    <div class="dmheader">
+
+      <button
+        class="iconbtn"
+        onclick="goHome()">
+
+        ←
+
+      </button>
+
+      <b style="font-size:19px">
+        식단 관리 🍱
+      </b>
+
+    </div>
+
+
+    <div
+      class="card"
+      style="margin-bottom:14px">
+
+      <div class="cardhead">
+        오늘 식단 입력
+      </div>
+
+      <input
+        id="mealMenu"
+        class="field"
+        placeholder="메인 메뉴 (예: 불고기)">
+
+      <input
+        id="mealSide"
+        class="field"
+        placeholder="반찬 (예: 된장국 · 시금치)">
+
+      <button
+        class="save"
+        onclick="saveMeal()">
+
+        저장
+
+      </button>
+
+    </div>
+
+
+    <div id="mealList"></div>
+
+  </section>
+
+
+  <section id="album" class="page">
+
+    <div class="dmheader">
+
+      <button
+        class="iconbtn"
+        onclick="goHome()">
+
+        ←
+
+      </button>
+
+
+      <b style="font-size:19px">
+        가족 앨범 📸
+      </b>
+
+
+      <label
+        id="albumUploadBtn"
+        class="iconbtn"
+        style="margin-left:auto;cursor:pointer;font-size:13px;font-weight:700">
+
+        📷 사진 추가
+
+        <input
+          type="file"
+          id="photoInput"
+          accept="image/*"
+          style="display:none"
+          onchange="uploadPhoto(this.files[0])">
+
+      </label>
+
+    </div>
+
+
+    <div
+      class="albumgrid"
+      id="albumGrid">
+    </div>
+
+  </section>
+
+
+  <div
+    class="lightbox"
+    id="lightbox">
+
+    <div class="lbbar">
+
+      <button
+        class="lbbtn"
+        onclick="closeLightbox()">
+
+        ✕
+
+      </button>
+
+
+      <button
+        id="lbDeleteBtn"
+        class="lbbtn lbdel"
+        onclick="deleteCurrentPhoto()">
+
+        🗑 삭제
+
+      </button>
+
+    </div>
+
+
+    <img
+      id="lightboxImg"
+      src="">
+
+  </div>
+
+
+  <section id="dm" class="page">
+
+    <div class="dmheader">
+
+      <button
+        class="iconbtn"
+        onclick="goHome()">
+
+        ←
+
+      </button>
+
+
+      <div
+        class="avatar"
+        id="dmAvatar">
+      </div>
+
+
+      <b id="dmName"></b>
+
+
+      <span class="calls">
+        📞　📹
+      </span>
+
+    </div>
+
+
+    <div
+      class="card chat dmbody"
+      id="dmMessages">
+    </div>
+
+
+    <div class="dmbar">
+
+      <label
+        class="file-btn"
+        title="사진 공유">
+
+        📷
+
+        <input
+          type="file"
+          accept="image/*"
+          style="display:none"
+          onchange="uploadChatPhoto(this.files[0], 'dm')">
+
+      </label>
+
+
+      <input
+        id="dmInputBox"
+        type="text"
+        placeholder="메시지 입력..."
+        onkeydown="if(event.key==='Enter')sendDm()">
+
+
+      <button onclick="sendDm()">
+        전송
+      </button>
+
+    </div>
+
+  </section>
+
+
+  <section id="more" class="page">
+
+    <div class="sectiontitle">
+      더보기 ☰
+    </div>
+
+
+    <div
+      class="listitem"
+      onclick="goToPage('album')"
+      style="cursor:pointer">
+
+      📸
+      <b>가족 앨범</b>
+
+      <span>›</span>
+
+    </div>
+
+
+    <div
+      class="listitem"
+      onclick="goToPage('resources')"
+      style="cursor:pointer">
+
+      📁
+      <b>자료실</b>
+
+      <span>›</span>
+
+    </div>
+
+
+    <div
+      class="listitem"
+      onclick="goToPage('notice')"
+      style="cursor:pointer">
+
+      📢
+      <b>공지사항</b>
+
+      <span>›</span>
+
+    </div>
+
+
+    <div
+      class="listitem"
+      onclick="goToPage('meal')"
+      style="cursor:pointer">
+
+      🍱
+      <b>식단 관리</b>
+
+      <span>›</span>
+
+    </div>
+
+
+    <div
+      class="listitem"
+      onclick="goToPage('anniversary')"
+      style="cursor:pointer">
+
+      🎂
+      <b>가족 기념일</b>
+
+      <span>›</span>
+
+    </div>
+
+
+    <div
+      id="adminSettingsCard"
+      class="card setting">
+
+      <div class="cardhead">
+
+        ⚙️ 가족 이름 관리
+
+        <span
+          style="font-size:11px;color:var(--blue);font-weight:400">
+
+          (관리자 전용)
+
+        </span>
+
+      </div>
+
+
+      <div class="small" style="margin-bottom:10px">이름과 프로필 사진을 가족별로 직접 바꿀 수 있어요.</div>
+      <div id="nameEditor" class="profile-manager"></div>
+
+      <button class="save" onclick="saveNames()">변경사항 저장</button>
+      <button class="save secondary-save" onclick="openAddMemberModal()">＋ 가족 구성원 추가</button>
+      <div class="small" style="margin-top:8px">기본 프로필은 가족사진 속 인물 느낌으로 제공하며, 휴대폰 사진을 직접 선택해 바꿀 수도 있어요.</div>
+
+    </div>
+
+  </section>
+
+</div>
+
+
+<div class="overlay" id="memberModal" onclick="if(event.target===this)closeAddMemberModal()">
+  <div class="sheet">
+    <div class="sheethead">
+      <div class="avatar" id="newMemberPreview">👤</div>
+      <div><b>가족 구성원 추가</b><div class="small">이름과 프로필 사진을 함께 설정하세요.</div></div>
+    </div>
+    <input id="newMemberName" class="field" placeholder="가족 구성원 이름">
+    <label class="save secondary-save" style="display:block;text-align:center;cursor:pointer">📷 프로필 사진 선택<input id="newMemberPhoto" type="file" accept="image/*" style="display:none" onchange="previewNewMemberPhoto(this.files[0])"></label>
+    <button class="save" onclick="saveNewFamilyMember()">추가하기</button>
+    <button class="sheetbtn cancel" onclick="closeAddMemberModal()">취소</button>
+  </div>
+</div>
+
+<div
+  class="overlay"
+  id="personOverlay"
+  onclick="if(event.target===this)closeSheet()">
+
+  <div class="sheet">
+
+    <div class="sheethead">
+
+      <div
+        class="avatar"
+        id="sheetAvatar">
+      </div>
+
+
+      <div>
+
+        <b id="sheetName"></b>
+
+        <div
+          class="small"
+          id="sheetPlace">
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <button
+      class="sheetbtn"
+      onclick="openDm()">
+
+      💬 1:1 채팅
+
+      <span
+        id="sheetBadge"
+        class="badge"
+        style="position:static;margin-left:auto">
+      </span>
+
+    </button>
+
+
+    <button
+      class="sheetbtn"
+      onclick="startCall('voice')">
+
+      📞 음성통화
+
+    </button>
+
+
+    <button
+      class="sheetbtn"
+      onclick="startCall('video')">
+
+      📹 영상통화
+
+    </button>
+
+
+    <button
+      class="sheetbtn cancel"
+      onclick="closeSheet()">
+
+      취소
+
+    </button>
+
+  </div>
+
+</div>
+
+
+<nav class="nav">
+
+  <button
+    class="tab active"
+    data-page="home">
+
+    <b>⌂</b>
+    홈
+
+  </button>
+
+
+  <button
+    class="tab"
+    data-page="chat"
+    style="position:relative">
+
+    <b>◌</b>
+    가족톡
+    <span
+      id="chatTabBadge"
+      class="badge"
+      style="top:2px;right:6px">
+    </span>
+
+  </button>
+
+
+  <button
+    class="tab"
+    data-page="schedule">
+
+    <b>▣</b>
+    일정
+
+  </button>
+
+
+  <button
+    class="tab"
+    data-page="map">
+
+    <b>⌖</b>
+    지도
+
+  </button>
+
+
+  <button
+    class="tab"
+    data-page="more">
+
+    <b>☰</b>
+    더보기
+
+  </button>
+
+</nav>
+
+
+<script
+  src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8df232422f24bc7cf58bca2734e9f1e8&autoload=false">
+</script>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+</script>
+
+
+<script>
+
+const SUPABASE_URL='https://ogrqjrtulhrpuuqnymkh.supabase.co';
+
+const SUPABASE_KEY='sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN';
+
+const PHOTO_BUCKET='family-photos';
+
+const sb=
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+let family =
+  JSON.parse(
+    localStorage.getItem('woorijipFamily') ||
+    '["아빠","엄마","와니","후야","니보"]'
+  );
+
+
+const icons=[
+  '👨',
+  '👩',
+  '🧒',
+  '🧒',
+  '🧒'
+];
+
+const defaultProfiles=[
+  './avatar-dad.jpg',
+  './avatar-mom.jpg',
+  './avatar-wani.jpg',
+  './avatar-huya.jpg',
+  './avatar-nibo.jpg',
+  './avatar-grandma.svg',
+  './avatar-grandpa.svg'
+];
+let profilePhotos=JSON.parse(localStorage.getItem('woorijipProfilePhotos')||'[]');
+function profileSrc(i){ return profilePhotos[i] || defaultProfiles[i] || (family[i]?.includes('할머니') ? './avatar-grandma.svg' : family[i]?.includes('할아버지') ? './avatar-grandpa.svg' : ''); }
+function avatarHtml(i, cls='avatar-img'){ const src=profileSrc(i); return src ? `<img class="${cls}" src="${src}" alt="${escapeHtml(family[i]||'가족')}" onerror="this.style.display='none'">` : (icons[i]||'👤'); }
+
+
+const places=[
+  '회사',
+  '집',
+  '학교',
+  '학원',
+  '집'
+];
+
+
+let activePersonIndex = null;
+
+let unreadCounts = {};
+
+
+let currentUser =
+  localStorage.getItem('woorijipMyName') ||
+  family[0];
+
+
+const ADMIN_NAME =
+  family[0];
+while(profilePhotos.length<family.length) profilePhotos.push('');
+profilePhotos=profilePhotos.slice(0,Math.max(profilePhotos.length,family.length));
+localStorage.setItem('woorijipProfilePhotos',JSON.stringify(profilePhotos));
+
+
+
+function checkAdminPermissions() {
+
+  const isAdmin =
+    currentUser === ADMIN_NAME;
+
+
+  const adminCard =
+    document.getElementById(
+      'adminSettingsCard'
+    );
+
+
+  const albumUploadBtn =
+    document.getElementById(
+      'albumUploadBtn'
+    );
+
+
+  const lbDeleteBtn =
+    document.getElementById(
+      'lbDeleteBtn'
+    );
+
+
+  if(adminCard)
+    adminCard.style.display =
+      isAdmin
+        ? 'block'
+        : 'none';
+
+
+  if(albumUploadBtn)
+    albumUploadBtn.style.display =
+      isAdmin
+        ? 'inline-block'
+        : 'none';
+
+
+  if(lbDeleteBtn)
+    lbDeleteBtn.style.display =
+      isAdmin
+        ? 'inline-block'
+        : 'none';
+
+}
+
+
+
+function initUserSelector() {
+
+  const sel =
+    document.getElementById(
+      'userSelector'
+    );
+
+
+  if(sel){
+
+    sel.innerHTML =
+      family.map(
+        name =>
+
+          `<option
+            value="${name}"
+            ${name===currentUser?'selected':''}>
+
+            👤 ${name}
+            ${name===ADMIN_NAME?' (관리자)':''}
+
+          </option>`
+
+      ).join('');
+
+  }
+
+}
+
+
+
+function changeCurrentUser(name) {
+
+  currentUser = name;
+
+
+  localStorage.setItem(
+    'woorijipMyName',
+    name
+  );
+
+
+  checkAdminPermissions();
+
+
+  renderGroup();
+
+
+  fetchUnreadCounts();
+
+
+  if(
+    document
+      .getElementById('dm')
+      .classList
+      .contains('active')
+  ){
+
+    loadDm();
+
+  }
+
+
+  updateLocationUserName();
+
+}
+
+
+
+const pad =
+  n => String(n).padStart(2,'0');
+
+
+const dateKey =
+  (y,m,d) =>
+    `${y}-${pad(m+1)}-${pad(d)}`;
+
+
+const todayKey =
+  () => {
+
+    const t =
+      new Date();
+
+    return dateKey(
+      t.getFullYear(),
+      t.getMonth(),
+      t.getDate()
+    );
+
+  };
+
+
+function updateHomeDate(){
+  const el=document.getElementById('homeDateLabel');
+  if(!el) return;
+  const d=new Date();
+  const days=['일','월','화','수','목','금','토'];
+  el.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+}
+function showHomeNotifications(){
+  const notice=document.getElementById('homeNoticeBody');
+  if(notice){
+    goToPage('notice');
+  }else{
+    showToast('새로운 알림이 없어요.');
+  }
+}
+
+const fmtDate =
+  k => {
+
+    const [y,m,d] =
+      k.split('-');
+
+    return `${m}월 ${d}일`;
+
+  };
+
+
+
+function setHomeMode(mode){
+  const bg=document.getElementById('backgroundHome');
+  const dash=document.getElementById('dashboardHome');
+  const bgBtn=document.getElementById('backgroundModeBtn');
+  const dashBtn=document.getElementById('dashboardModeBtn');
+  const useBg=mode==='background';
+  if(bg) bg.classList.toggle('show',useBg);
+  if(dash) dash.classList.toggle('hide',useBg);
+  if(bgBtn) bgBtn.classList.toggle('active',useBg);
+  if(dashBtn) dashBtn.classList.toggle('active',!useBg);
+  localStorage.setItem('woorijipHomeMode',mode);
+  if(!useBg){
+    setTimeout(()=>{ initHomeLocationMap(); renderHomeLocationDashboard(); },80);
+  }
+}
+
+function renderBackgroundFamily(){
+  const el=document.getElementById('backgroundFamily');
+  if(!el) return;
+  el.innerHTML=family.map((n,i)=>`
+    <div class="person">
+      <div class="avatar">${avatarHtml(i)}<div class="dot"></div></div>
+      <div class="name">${n}${n===currentUser?' · 나':''}</div>
+      <div class="place">${places[i]||'가족'}</div>
+    </div>`).join('');
+}
+
+function renderHomeLocationDashboard(){
+  const el=document.getElementById('homeLocationBody');
+  if(!el) return;
+  const byName={};
+  (familyLocationData||[]).forEach(x=>byName[x.user_name]=x);
+  el.innerHTML=family.map((name,i)=>{
+    const loc=byName[name];
+    const age=loc&&loc.updated_at ? Date.now()-new Date(loc.updated_at).getTime() : Infinity;
+    const status=age<5*60*1000?'online':age<30*60*1000?'moving':'offline';
+    const label=status==='online'?'정상':status==='moving'?'최근 업데이트':'오프라인';
+    const time=loc?formatLocationTime(loc.updated_at):'위치 없음';
+    return `<div class="home-location-item"><span class="status-dot ${status}"></span><span class="loc-name">${icons[i]||'👤'} ${name}</span><span class="loc-time">${label} · ${time}</span></div>`;
+  }).join('');
+}
+
+function initHomeLocationMap(){
+  const el=document.getElementById('homeLocationMap');
+  if(!el || el.dataset.ready==='1') return;
+  if(!(window.kakao && kakao.maps)) return;
+  kakao.maps.load(()=>{
+    if(el.dataset.ready==='1') return;
+    el.innerHTML='';
+    const map=new kakao.maps.Map(el,{center:new kakao.maps.LatLng(37.2005,127.1008),level:7});
+    el.dataset.ready='1';
+    (familyLocationData||[]).forEach(loc=>{
+      const pos=new kakao.maps.LatLng(Number(loc.latitude),Number(loc.longitude));
+      new kakao.maps.CustomOverlay({position:pos,yAnchor:1,content:makeMarkerContent(getFamilyIcon(loc.user_name),loc.user_name,loc.user_name===currentUser)}).setMap(map);
+    });
+    if(familyLocationData&&familyLocationData.length>1){
+      const bounds=new kakao.maps.LatLngBounds();
+      familyLocationData.forEach(loc=>bounds.extend(new kakao.maps.LatLng(Number(loc.latitude),Number(loc.longitude))));
+      map.setBounds(bounds,{top:18,right:18,bottom:18,left:18});
+    }else if(familyLocationData&&familyLocationData.length===1){
+      const loc=familyLocationData[0]; map.setCenter(new kakao.maps.LatLng(Number(loc.latitude),Number(loc.longitude))); map.setLevel(5);
+    }
+    el._map=map;
+  });
+}
+
+function updateHomeLocationMap(){
+  const el=document.getElementById('homeLocationMap');
+  if(!el || !el._map || !(window.kakao&&kakao.maps)) return;
+  homeLocationMarkers.forEach(m=>m.setMap(null));
+  homeLocationMarkers=[];
+  const map=el._map;
+  const bounds=new kakao.maps.LatLngBounds();
+  (familyLocationData||[]).forEach(loc=>{
+    const pos=new kakao.maps.LatLng(Number(loc.latitude),Number(loc.longitude)); bounds.extend(pos);
+    const marker=new kakao.maps.CustomOverlay({position:pos,yAnchor:1,content:makeMarkerContent(getFamilyIcon(loc.user_name),loc.user_name,loc.user_name===currentUser)});
+    marker.setMap(map); homeLocationMarkers.push(marker);
+  });
+  if(familyLocationData&&familyLocationData.length>1) map.setBounds(bounds,{top:18,right:18,bottom:18,left:18});
+  else if(familyLocationData&&familyLocationData.length===1){ const loc=familyLocationData[0]; map.setCenter(new kakao.maps.LatLng(Number(loc.latitude),Number(loc.longitude))); map.setLevel(5); }
+}
+
+function renderFamily(){
+
+  const familyElem =
+    document.getElementById(
+      'familyHome'
+    );
+
+
+  const nameEditorElem =
+    document.getElementById(
+      'nameEditor'
+    );
+
+
+  if(familyElem){
+
+    familyElem.innerHTML =
+      family.map((n,i)=>{
+
+        const count =
+          unreadCounts[n] || 0;
+
+
+        return `
+          <div
+            class="person"
+            onclick="openPersonSheet(${i})">
+
+            <div class="avatar">
+
+              ${avatarHtml(i)}
+
+              <span
+                class="badge ${count > 0 ? 'show' : ''}">
+
+                ${count}
+
+              </span>
+
+
+              <div class="dot"></div>
+
+            </div>
+
+
+            <div class="name">
+              ${n}
+            </div>
+
+
+            <div class="place">
+              ${places[i]||'집'}
+            </div>
+
+          </div>
+        `;
+
+      }).join('');
+
+  }
+
+
+  if(nameEditorElem){
+    nameEditorElem.innerHTML=family.map((n,i)=>`
+      <div class="member-editor">
+        <div class="member-avatar-wrap">
+          <img class="member-avatar-img" id="profilePreview${i}" src="${profileSrc(i)||''}" alt="${escapeHtml(n)}" onerror="this.style.display='none'">
+          <span class="member-camera">📷</span>
+        </div>
+        <div class="member-info">
+          <input class="member-name-input" id="name${i}" value="${escapeHtml(n)}" placeholder="가족 이름">
+          <div class="small" style="margin-top:4px">${i===0?'관리자 · 아빠':i===1?'가족 구성원 2':'가족 구성원 '+(i+1)}</div>
+        </div>
+        <div class="member-actions">
+          <label>사진 변경<input type="file" accept="image/*" onchange="changeProfilePhoto(${i},this.files[0])"></label>
+        </div>
+      </div>`).join('');
+  }
+
+
+  initUserSelector();
+
+}
+
+
+
+function openAddMemberModal(){
+  if(currentUser!==ADMIN_NAME){alert('관리자(아빠)만 구성원을 추가할 수 있어요.');return;}
+  if(family.length>=20){alert('가족 구성원은 최대 20명까지 추가할 수 있어요.');return;}
+  document.getElementById('newMemberName').value='';
+  document.getElementById('newMemberPhoto').value='';
+  document.getElementById('newMemberPreview').innerHTML='👤';
+  document.getElementById('memberModal').classList.add('show');
+}
+function closeAddMemberModal(){ document.getElementById('memberModal')?.classList.remove('show'); }
+function previewNewMemberPhoto(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{ document.getElementById('newMemberPreview').innerHTML=`<img class="avatar-img" src="${r.result}" alt="">`; document.getElementById('newMemberPreview').dataset.photo=r.result; };
+  r.readAsDataURL(file);
+}
+function saveNewFamilyMember(){
+  if(currentUser!==ADMIN_NAME)return;
+  const input=document.getElementById('newMemberName');
+  const clean=(input.value||'').trim();
+  if(!clean){alert('이름을 입력해주세요.');return;}
+  if(family.includes(clean)){alert('이미 등록된 이름이에요.');return;}
+  if(family.length>=20)return;
+  const preview=document.getElementById('newMemberPreview');
+  family.push(clean);
+  profilePhotos.push(preview.dataset.photo||'');
+  localStorage.setItem('woorijipFamily',JSON.stringify(family));
+  localStorage.setItem('woorijipProfilePhotos',JSON.stringify(profilePhotos));
+  closeAddMemberModal();
+  renderFamily(); checkAdminPermissions();
+  alert(clean+'님을 가족 구성원으로 추가했어요.');
+}
+function changeProfilePhoto(i,file){
+  if(currentUser!==ADMIN_NAME){alert('관리자(아빠)만 프로필 사진을 변경할 수 있어요.');return;}
+  if(!file)return;
+  if(!file.type.startsWith('image/')){alert('이미지 파일만 선택할 수 있어요.');return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    profilePhotos[i]=reader.result;
+    localStorage.setItem('woorijipProfilePhotos',JSON.stringify(profilePhotos));
+    renderFamily(); checkAdminPermissions();
+    showToast(family[i]+'님의 프로필 사진을 변경했어요.');
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveNames(){
+
+  if(currentUser !== ADMIN_NAME){
+
+    alert(
+      '관리자(아빠)만 변경 가능합니다.'
+    );
+
+    return;
+
+  }
+
+
+  family =
+    family.map((_,i)=>{
+
+      const el =
+        document.getElementById(
+          'name'+i
+        );
+
+
+      return el
+        ? (
+            el.value.trim() ||
+            family[i]
+          )
+        : family[i];
+
+    });
+
+
+  localStorage.setItem(
+    'woorijipFamily',
+    JSON.stringify(family)
+  );
+
+
+  renderFamily();
+
+
+  alert(
+    '가족 이름을 저장했어요!'
+  );
+
+}
+
+
+
+function openPersonSheet(i){
+
+  activePersonIndex = i;
+
+
+  const targetUser =
+    family[i];
+
+
+  const count =
+    unreadCounts[targetUser] || 0;
+
+
+  document
+    .getElementById('sheetAvatar')
+    .innerHTML = avatarHtml(i);
+
+
+  document
+    .getElementById('sheetName')
+    .textContent =
+      targetUser;
+
+
+  document
+    .getElementById('sheetPlace')
+    .textContent =
+      places[i] || '집';
+
+
+  const badgeElem =
+    document.getElementById(
+      'sheetBadge'
+    );
+
+
+  if(badgeElem){
+
+    badgeElem.textContent =
+      count;
+
+
+    badgeElem.className =
+      `badge ${count > 0 ? 'show' : ''}`;
+
+  }
+
+
+  document
+    .getElementById(
+      'personOverlay'
+    )
+    .classList
+    .add('show');
+
+}
+
+
+
+function closeSheet(){
+
+  document
+    .getElementById(
+      'personOverlay'
+    )
+    .classList
+    .remove('show');
+
+}
+
+
+
+function showToast(text) {
+
+  const toast =
+    document.getElementById(
+      'toast'
+    );
+
+
+  const msg =
+    document.getElementById(
+      'toastMsg'
+    );
+
+
+  if(toast && msg){
+
+    msg.textContent =
+      text;
+
+
+    toast
+      .classList
+      .add('show');
+
+
+    setTimeout(
+
+      () =>
+
+        toast
+          .classList
+          .remove('show'),
+
+      3000
+
+    );
+
+  }
+
+}
+
+
+
+
+/* ===== 일정 알림 ===== */
+const SCHEDULE_REMINDER_KEY = 'wanhuyulScheduleReminders';
+const REMINDER_CHECK_MS = 30000;
+
+function getScheduleReminders(){
+  try { return JSON.parse(localStorage.getItem(SCHEDULE_REMINDER_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function setScheduleReminder(key, minutes){
+  const all = getScheduleReminders();
+  if(Number(minutes) > 0) all[key] = Number(minutes);
+  else delete all[key];
+  localStorage.setItem(SCHEDULE_REMINDER_KEY, JSON.stringify(all));
+}
+function scheduleReminderKey(date,time,text){
+  return `${date}|${time}|${text}`;
+}
+async function requestReminderPermission(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission === 'denied') return false;
+  try { return (await Notification.requestPermission()) === 'granted'; }
+  catch(e){ return false; }
+}
+function fireScheduleReminder(text, date, time){
+  const msg = `🔔 ${time} 일정: ${text}`;
+  showToast(msg);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{
+      new Notification('완후율 일정 알림', {body:msg, icon:'./icon-192.png', tag:`schedule-${date}-${time}`});
+    }catch(e){}
+  }
+}
+function checkScheduleReminders(){
+  const now = new Date();
+  const all = getScheduleReminders();
+  Object.keys(all).forEach(key=>{
+    const parts = key.split('|');
+    if(parts.length < 3) return;
+    const date = parts[0], time = parts[1], text = parts.slice(2).join('|');
+    const mins = Number(all[key] || 0);
+    const target = new Date(`${date}T${time}:00`);
+    if(Number.isNaN(target.getTime())) return;
+    const diff = target.getTime() - now.getTime();
+    const firedKey = `${key}|${new Date(target.getTime()).toDateString()}`;
+    if(diff <= mins*60000 && diff > -90000 && !sessionStorage.getItem('reminded:'+firedKey)){
+      sessionStorage.setItem('reminded:'+firedKey,'1');
+      fireScheduleReminder(text,date,time);
+    }
+  });
+}
+setInterval(checkScheduleReminders, REMINDER_CHECK_MS);
+
+/* ===== 가족 기념일 ===== */
+let anniversaryData = [];
+let anniversaryChannel = null;
+
+async function loadAnniversaries(){
+  const e=document.getElementById('anniversaryList');
+  if(!e) return;
+  e.innerHTML='<div class="empty-msg">기념일을 불러오는 중...</div>';
+  const {data,error}=await sb.from('family_anniversaries').select('*').order('month',{ascending:true}).order('day',{ascending:true});
+  if(error){
+    e.innerHTML='<div class="empty-msg">기념일 저장 기능을 준비하려면 Supabase에 family_anniversaries 테이블을 만들어 주세요.<br><span class="small">'+escapeHtml(error.message)+'</span></div>';
+    return;
+  }
+  anniversaryData=data||[];
+  renderAnniversaries();
+  syncAnniversariesToSchedule();
+  if(!anniversaryChannel){
+    anniversaryChannel=sb.channel('public:family_anniversaries').on('postgres_changes',{event:'*',schema:'public',table:'family_anniversaries'},()=>loadAnniversaries()).subscribe();
+  }
+}
+
+async function saveAnniversary(){
+  const type=document.getElementById('annivType')?.value || '⭐ 기타';
+  const name=document.getElementById('annivName')?.value.trim();
+  const date=document.getElementById('annivDate')?.value;
+  if(!name || !date){ alert('이름과 날짜를 입력해주세요.'); return; }
+  const [year,month,day]=date.split('-').map(Number);
+  const {error}=await sb.from('family_anniversaries').insert([{
+    type,name,month,day,original_date:date,created_by:currentUser
+  }]);
+  if(error){ alert('기념일 저장 실패: '+error.message); return; }
+  document.getElementById('annivName').value='';
+  document.getElementById('annivDate').value='';
+  document.getElementById('anniversaryForm').style.display='none';
+  await syncAnniversariesToSchedule();
+  loadAnniversaries();
+}
+function toggleAnniversaryForm(){
+  const f=document.getElementById('anniversaryForm');
+  if(f) f.style.display=f.style.display==='none'?'block':'none';
+}
+async function deleteAnniversary(id){
+  const item=anniversaryData.find(x=>x.id===id);
+  if(item && !canManage(item.created_by)){ alert('작성자 또는 관리자(아빠)만 삭제할 수 있어요.'); return; }
+  const {error}=await sb.from('family_anniversaries').delete().eq('id',id);
+  if(error){ alert('기념일 삭제 실패: '+error.message); return; }
+  await sb.from('schedule_items').delete().eq('source_type','anniversary').eq('source_id',id);
+  loadAnniversaries();
+}
+async function syncAnniversariesToSchedule(){
+  if(!anniversaryData.length) return;
+  const year=new Date().getFullYear();
+  // Existing rows are checked individually so no unique constraint is required.
+  for(const a of anniversaryData){
+    const date=`${year}-${pad(Number(a.month))}-${pad(Number(a.day))}`;
+    const {data:rows}=await sb.from('schedule_items').select('id').eq('source_type','anniversary').eq('source_id',a.id).eq('date',date).limit(1);
+    if(rows && rows.length) continue;
+    await sb.from('schedule_items').insert([{date,time:'09:00',content:`${a.type} ${a.name}`,reminder_minutes:1440,created_by:a.created_by||ADMIN_NAME,source_type:'anniversary',source_id:a.id}]);
+  }
+}
+
+function nextAnnivDate(month,day){
+  const now=new Date(); let y=now.getFullYear();
+  let d=new Date(y,Number(month)-1,Number(day));
+  if(d < new Date(y,now.getMonth(),now.getDate())) d=new Date(y+1,Number(month)-1,Number(day));
+  return d;
+}
+function renderAnniversaries(){
+  const e=document.getElementById('anniversaryList'); if(!e) return;
+  const list=[...anniversaryData].sort((a,b)=>nextAnnivDate(a.month,a.day)-nextAnnivDate(b.month,b.day));
+  if(!list.length){ e.innerHTML='<div class="empty-msg">등록된 기념일이 없어요.</div>'; return; }
+  e.innerHTML=list.map(x=>{
+    const label=x.type.split(' ')[1]||'기념일';
+    const dateText=`${Number(x.month)}/${Number(x.day)}`;
+    return `<div class="listitem anniv-card">
+      <div class="anniv-date"><b>${dateText}</b><span>${escapeHtml(label)}</span></div>
+      <div style="flex:1"><div style="font-weight:800">${escapeHtml(x.name)}</div><div class="small">${escapeHtml(x.type)} · 매년 반복</div></div>
+      ${canManage(x.created_by)?`<button class="del" onclick="deleteAnniversary(${x.id})">✕</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ===== 자료실 ===== */
+let resourceList=[];
+async function loadResources(){
+  const e=document.getElementById('resourceList'); if(!e) return;
+  const {data,error}=await sb.storage.from(PHOTO_BUCKET).list('resources',{limit:100,sortBy:{column:'created_at',order:'desc'}});
+  if(error){ e.innerHTML='<div class="empty-msg">자료실을 불러오지 못했어요.<br><span class="small">'+error.message+'</span></div>'; return; }
+  resourceList=(data||[]).filter(x=>x.name && x.name !== '.emptyFolderPlaceholder');
+  renderResources();
+}
+function resourceIcon(name){
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  if(['jpg','jpeg','png','gif','webp','heic'].includes(ext)) return '🖼️';
+  if(ext==='pdf') return '📕';
+  if(['doc','docx','hwp','hwpx'].includes(ext)) return '📘';
+  if(['xls','xlsx','csv'].includes(ext)) return '📊';
+  if(['zip','7z'].includes(ext)) return '🗜️';
+  return '📄';
+}
+function renderResources(){
+  const e=document.getElementById('resourceList'); if(!e) return;
+  if(!resourceList.length){e.innerHTML='<div class="empty-msg">등록된 자료가 없어요.</div>';return;}
+  e.innerHTML=resourceList.map((x,i)=>{
+    const path=`resources/${x.name}`;
+    const url=sb.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+    return `<div class="resource-link">
+      <div class="resource-icon">${resourceIcon(x.name)}</div>
+      <div class="resource-info"><div class="resource-name">${escapeHtml(x.name)}</div><div class="resource-meta">${x.created_at?new Date(x.created_at).toLocaleString('ko-KR'):''}</div></div>
+      <div class="resource-actions"><a href="${url}" target="_blank" rel="noopener">열기</a>${currentUser===ADMIN_NAME?`<button onclick="deleteResource('${encodeURIComponent(x.name)}')">삭제</button>`:''}</div>
+    </div>`;
+  }).join('');
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function uploadResource(){
+  if(currentUser!==ADMIN_NAME){alert('관리자(아빠)만 자료를 올릴 수 있어요.');return;}
+  const input=document.getElementById('resourceFile'), file=input?.files?.[0];
+  if(!file)return;
+  const safe=file.name.replace(/[^\w가-힣.\- ()]/g,'_');
+  const path=`resources/${Date.now()}_${safe}`;
+  const {error}=await sb.storage.from(PHOTO_BUCKET).upload(path,file,{upsert:false});
+  if(error){alert('자료 업로드 실패: '+error.message);return;}
+  input.value='';
+  loadResources();
+}
+async function deleteResource(encoded){
+  if(currentUser!==ADMIN_NAME){alert('관리자(아빠)만 삭제할 수 있어요.');return;}
+  const name=decodeURIComponent(encoded);
+  if(!confirm('이 자료를 삭제할까요?'))return;
+  const {error}=await sb.storage.from(PHOTO_BUCKET).remove([`resources/${name}`]);
+  if(error){alert('자료 삭제 실패: '+error.message);return;}
+  loadResources();
+}
+function initExtraPages(){
+  const box=document.getElementById('resourceUploadBox');
+  if(box) box.style.display=currentUser===ADMIN_NAME?'block':'none';
+  loadResources();
+  loadAnniversaries();
+}
+
+/* ===== 일정 저장 보완 ===== */
+
+function goToPage(id){
+
+  document
+    .querySelectorAll('.page')
+    .forEach(
+      p =>
+        p.classList.remove('active')
+    );
+
+
+  const target =
+    document.getElementById(id);
+
+
+  if(target)
+    target.classList.add('active');
+
+
+  document
+    .querySelectorAll('.tab')
+    .forEach(
+      x =>
+        x.classList.remove('active')
+    );
+
+
+  const tab =
+    document.querySelector(
+      `.tab[data-page="${id}"]`
+    );
+
+
+  if(tab)
+    tab.classList.add('active');
+
+  if(id === 'resources') loadResources();
+  if(id === 'anniversary') loadAnniversaries();
+
+
+  window.scrollTo(0,0);
+
+
+  if(id==='map')
+    initKakaoMap();
+
+
+  if(id==='chat')
+    updateChatTabBadge();
+
+}
+
+
+
+function goHome(){
+
+  goToPage('home');
+
+}
+
+
+
+function formatMessageContent(content) {
+
+  if(
+    content.startsWith(
+      '[IMAGE]:'
+    )
+  ){
+
+    const url =
+      content.replace(
+        '[IMAGE]:',
+        ''
+      );
+
+
+    return `
+      <img
+        src="${url}"
+        class="chat-img"
+        onclick="openChatImageLightbox('${url}')"
+        alt="전송된 사진"
+        loading="lazy">
+    `;
+
+  }
+
+
+  return content;
+
+}
+
+
+
+function openChatImageLightbox(url) {
+
+  currentPhotoIdx =
+    null;
+
+
+  const lbDeleteBtn =
+    document.getElementById(
+      'lbDeleteBtn'
+    );
+
+
+  if(lbDeleteBtn)
+    lbDeleteBtn.style.display =
+      'none';
+
+
+  document
+    .getElementById(
+      'lightboxImg'
+    )
+    .src =
+      url;
+
+
+  document
+    .getElementById(
+      'lightbox'
+    )
+    .classList
+    .add('show');
+
+}
+
+
+
+async function uploadChatPhoto(
+  file,
+  type
+){
+
+  if(!file)
+    return;
+
+
+  const path =
+    `chat_${Date.now()}_${file.name}`;
+
+
+  const { error } =
+    await sb
+      .storage
+      .from(PHOTO_BUCKET)
+      .upload(
+        path,
+        file
+      );
+
+
+  if(error){
+
+    alert(
+      '사진 업로드 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  const imgUrl =
+    sb
+      .storage
+      .from(PHOTO_BUCKET)
+      .getPublicUrl(path)
+      .data
+      .publicUrl;
+
+
+  const formattedContent =
+    `[IMAGE]:${imgUrl}`;
+
+
+  if(type === 'group'){
+
+    await sb
+      .from('family_messages')
+      .insert([
+        {
+          sender_name:
+            currentUser,
+
+          content:
+            formattedContent
+        }
+      ]);
+
+  }
+
+
+  else if(
+    type === 'dm' &&
+    activePersonIndex !== null
+  ){
+
+    const targetUser =
+      family[
+        activePersonIndex
+      ];
+
+
+    await sb
+      .from('direct_messages')
+      .insert([
+        {
+          sender_name:
+            currentUser,
+
+          receiver_name:
+            targetUser,
+
+          content:
+            formattedContent,
+
+          is_read:
+            false
+        }
+      ]);
+
+  }
+
+}
+
+
+
+let dmMessagesList = [];
+
+
+async function fetchUnreadCounts(){
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('direct_messages')
+      .select('sender_name')
+      .eq(
+        'receiver_name',
+        currentUser
+      )
+      .eq(
+        'is_read',
+        false
+      );
+
+
+  if(!error && data){
+
+    unreadCounts = {};
+
+
+    data.forEach(
+      m => {
+
+        unreadCounts[
+          m.sender_name
+        ] =
+          (
+            unreadCounts[
+              m.sender_name
+            ] || 0
+          ) + 1;
+
+      }
+    );
+
+
+    renderFamily();
+
+  }
+
+}
+
+
+
+function openDm(){
+
+  closeSheet();
+
+  goToPage('dm');
+
+  loadDm();
+
+}
+
+
+
+async function loadDm(){
+
+  if(
+    activePersonIndex === null
+  )
+    return;
+
+
+  const targetUser =
+    family[
+      activePersonIndex
+    ];
+
+
+  document
+    .getElementById(
+      'dmAvatar'
+    )
+    .innerHTML = avatarHtml(activePersonIndex);
+
+
+  document
+    .getElementById(
+      'dmName'
+    )
+    .textContent =
+      targetUser;
+
+
+  await sb
+    .from('direct_messages')
+    .update({
+      is_read:
+        true
+    })
+    .eq(
+      'sender_name',
+      targetUser
+    )
+    .eq(
+      'receiver_name',
+      currentUser
+    )
+    .eq(
+      'is_read',
+      false
+    );
+
+
+  unreadCounts[
+    targetUser
+  ] = 0;
+
+
+  renderFamily();
+
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('direct_messages')
+      .select('*')
+      .or(
+        `and(sender_name.eq.${currentUser},receiver_name.eq.${targetUser}),and(sender_name.eq.${targetUser},receiver_name.eq.${currentUser})`
+      )
+      .order(
+        'created_at',
+        {
+          ascending:true
+        }
+      );
+
+
+  if(!error && data){
+
+    dmMessagesList =
+      data;
+
+    renderDm();
+
+  }
+
+}
+
+
+
+function renderDm(){
+
+  const msgElem =
+    document.getElementById(
+      'dmMessages'
+    );
+
+
+  if(!msgElem)
+    return;
+
+
+  msgElem.innerHTML =
+    dmMessagesList.length
+
+      ? dmMessagesList
+          .map(
+            m => {
+
+              const isMe =
+                m.sender_name ===
+                currentUser;
+
+
+              return `
+                <div
+                  class="bubble${isMe ? ' me' : ''}">
+
+                  ${formatMessageContent(m.content)}
+
+                </div>
+              `;
+
+            }
+          )
+          .join('')
+
+      :
+
+        '<div class="empty-msg">대화 내용이 없습니다. 첫 메시지를 보내보세요!</div>';
+
+
+  msgElem.scrollTop =
+    999999;
+
+}
+
+
+
+async function sendDm(){
+
+  const box =
+    document.getElementById(
+      'dmInputBox'
+    );
+
+
+  if(!box)
+    return;
+
+
+  const text =
+    box.value.trim();
+
+
+  if(
+    !text ||
+    activePersonIndex === null
+  )
+    return;
+
+
+  const targetUser =
+    family[
+      activePersonIndex
+    ];
+
+
+  box.value =
+    '';
+
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('direct_messages')
+      .insert([
+        {
+          sender_name:
+            currentUser,
+
+          receiver_name:
+            targetUser,
+
+          content:
+            text,
+
+
+          is_read:
+            false
+        }
+      ])
+      .select();
+
+
+  if(error){
+
+    alert(
+      '메시지 전송 실패: ' +
+      error.message
+    );
+
+  }
+
+
+  else if(
+    data &&
+    data.length > 0
+  ){
+
+    const exists =
+      dmMessagesList.some(
+        m =>
+          m.id === data[0].id
+      );
+
+
+    if(!exists){
+
+      dmMessagesList.push(
+        data[0]
+      );
+
+
+      renderDm();
+
+    }
+
+  }
+
+}
+
+
+
+function initDmRealtime(){
+
+  sb
+    .channel(
+      'public:direct_messages'
+    )
+
+    .on(
+      'postgres_changes',
+
+      {
+        event:
+          'INSERT',
+
+        schema:
+          'public',
+
+        table:
+          'direct_messages'
+      },
+
+
+      async payload => {
+
+        const msg =
+          payload.new;
+
+
+        if(
+          msg.receiver_name ===
+          currentUser
+        ){
+
+          const isDmActive =
+            document
+              .getElementById('dm')
+              .classList
+              .contains('active');
+
+
+          const targetUser =
+            activePersonIndex !== null
+
+              ? family[
+                  activePersonIndex
+                ]
+
+              : null;
+
+
+          if(
+            isDmActive &&
+            targetUser ===
+            msg.sender_name
+          ){
+
+            dmMessagesList.push(
+              msg
+            );
+
+
+            renderDm();
+
+
+            await sb
+              .from('direct_messages')
+              .update({
+                is_read:
+                  true
+              })
+              .eq(
+                'id',
+                msg.id
+              );
+
+          }
+
+
+          else{
+
+            unreadCounts[
+              msg.sender_name
+            ] =
+              (
+                unreadCounts[
+                  msg.sender_name
+                ] || 0
+              ) + 1;
+
+
+            renderFamily();
+
+
+            const displayMsg =
+              msg.content.startsWith(
+                '[IMAGE]:'
+              )
+
+                ? '📷 사진을 보냈습니다.'
+
+                : msg.content;
+
+
+            showToast(
+              `${msg.sender_name}님: ${displayMsg}`
+            );
+
+          }
+
+        }
+
+      }
+
+    )
+
+    .subscribe();
+
+}
+
+
+
+function startCall(type){
+
+  const name =
+    family[
+      activePersonIndex
+    ];
+
+
+  closeSheet();
+
+
+  alert(
+    `${name}님에게 ${
+      type==='voice'
+        ? '음성'
+        : '영상'
+    }통화를 겁니다 ${
+      type==='voice'
+        ? '📞'
+        : '📹'
+    }`
+  );
+
+}
+
+
+
+let groupChat = [];
+
+const GROUP_LAST_READ_KEY =
+  'woorijipGroupLastRead';
+
+
+
+function updateChatTabBadge(){
+
+  const b =
+    document.getElementById(
+      'chatTabBadge'
+    );
+
+
+  if(!b)
+    return;
+
+
+  const lastRead =
+    localStorage.getItem(
+      GROUP_LAST_READ_KEY
+    ) ||
+      '1970-01-01T00:00:00.000Z';
+
+
+  const onChatPage =
+    document
+      .getElementById('chat')
+      .classList
+      .contains('active');
+
+
+  if(onChatPage){
+
+    markGroupChatRead();
+
+    b.classList.remove('show');
+
+    return;
+
+  }
+
+
+  const unread =
+    groupChat.filter(
+      m =>
+        m.sender_name !==
+          currentUser &&
+
+        m.created_at >
+          lastRead
+    ).length;
+
+
+  if(unread > 0){
+
+    b.textContent =
+      unread > 9
+
+        ? '9+'
+
+        : String(unread);
+
+
+    b.classList.add('show');
+
+  }
+
+  else{
+
+    b.classList.remove('show');
+
+  }
+
+}
+
+
+
+function markGroupChatRead(){
+
+  const last =
+    groupChat[
+      groupChat.length - 1
+    ];
+
+
+  localStorage.setItem(
+    GROUP_LAST_READ_KEY,
+
+    last
+
+      ? last.created_at
+
+      : new Date().toISOString()
+  );
+
+}
+
+
+
+async function initGroupChat(){
+
+  try{
+
+    const {
+      data,
+      error
+    } =
+      await sb
+        .from('family_messages')
+        .select('*')
+        .order(
+          'created_at',
+          {
+            ascending:true
+          }
+        );
+
+
+    if(
+      !error &&
+      data
+    ){
+
+      groupChat =
+        data;
+
+
+      renderGroup();
+
+    }
+
+
+    sb
+      .channel(
+        'public:family_messages'
+      )
+
+      .on(
+        'postgres_changes',
+
+        {
+          event:
+            'INSERT',
+
+          schema:
+            'public',
+
+          table:
+            'family_messages'
+        },
+
+
+        payload => {
+
+          const exists =
+            groupChat.some(
+              m =>
+                m.id &&
+                m.id ===
+                payload.new.id
+            );
+
+
+          if(!exists){
+
+            groupChat.push(
+              payload.new
+            );
+
+
+            renderGroup();
+
+
+            if(
+              payload.new.sender_name !==
+              currentUser &&
+
+              !document
+                .getElementById('chat')
+                .classList
+                .contains('active')
+            ){
+
+              const displayMsg =
+                payload.new.content.startsWith(
+                  '[IMAGE]:'
+                )
+
+                  ? '📷 사진을 보냈습니다.'
+
+                  : payload.new.content;
+
+
+              showToast(
+                `[가족톡] ${payload.new.sender_name}: ${displayMsg}`
+              );
+
+            }
+
+          }
+
+        }
+
+      )
+
+      .subscribe();
+
+  }
+
+
+  catch(e){
+
+    console.error(
+      '채팅 연결 예외:',
+      e
+    );
+
+  }
+
+}
+
+
+
+function renderGroup(){
+
+  const msgContainer =
+    document.getElementById(
+      'groupMessages'
+    );
+
+
+  if(!msgContainer)
+    return;
+
+
+  msgContainer.innerHTML =
+    groupChat.length
+
+      ? groupChat
+          .map(
+            m => {
+
+              const isMe =
+                m.sender_name ===
+                currentUser;
+
+
+              return `
+                <div
+                  class="bubble${isMe ? ' me' : ''}">
+
+                  ${
+                    isMe
+
+                      ? ''
+
+                      :
+
+                        `<b
+                          style="
+                            display:block;
+                            font-size:11px;
+                            color:var(--sub);
+                            margin-bottom:2px">
+
+                          ${getFamilyIcon(m.sender_name)}
+                          ${m.sender_name}
+
+                        </b>`
+                  }
+
+                  ${formatMessageContent(m.content)}
+
+                </div>
+              `;
+
+            }
+          )
+          .join('')
+
+      :
+
+        '<div class="empty-msg">가족들과 나눈 대화가 없습니다.</div>';
+
+
+  msgContainer.scrollTop =
+    999999;
+
+
+  updateChatTabBadge();
+
+
+  const last =
+    groupChat[
+      groupChat.length - 1
+    ];
+
+
+  const previewElem =
+    document.getElementById(
+      'chatPreview'
+    );
+
+
+  if(previewElem){
+
+    if(last){
+
+      const isMe =
+        last.sender_name ===
+        currentUser;
+
+
+      const text =
+        last.content.startsWith(
+          '[IMAGE]:'
+        )
+
+          ? '📷 사진'
+
+          : last.content;
+
+
+      previewElem.textContent =
+        (
+          isMe
+
+            ? '나: '
+
+            : `${last.sender_name}: `
+        )
+        +
+        text;
+
+    }
+
+
+    else{
+
+      previewElem.textContent =
+        '새로운 첫 메시지를 남겨보세요!';
+
+    }
+
+  }
+
+}
+
+
+
+async function sendGroup(){
+
+  const box =
+    document.getElementById(
+      'groupInputBox'
+    );
+
+
+  if(!box)
+    return;
+
+
+  const text =
+    box.value.trim();
+
+
+  if(!text)
+    return;
+
+
+  box.value =
+    '';
+
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('family_messages')
+      .insert([
+        {
+          sender_name:
+            currentUser,
+
+          content:
+            text,
+
+        }
+      ])
+      .select();
+
+
+  if(error){
+
+    alert(
+      '메시지 전송 실패: ' +
+      error.message
+    );
+
+  }
+
+
+  else if(
+    data &&
+    data.length > 0
+  ){
+
+    const exists =
+      groupChat.some(
+        m =>
+          m.id ===
+          data[0].id
+      );
+
+
+    if(!exists){
+
+      groupChat.push(
+        data[0]
+      );
+
+
+      renderGroup();
+
+    }
+
+  }
+
+}
+
+
+
+/* ===== 일정 ===== */
+
+let scheduleData = {};
+
+let calDate =
+  new Date();
+
+let selectedDate =
+  todayKey();
+
+let editingSchedId =
+  null;
+
+
+
+async function initSchedule(){
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('schedule_items')
+      .select('*')
+      .order(
+        'time',
+        {
+          ascending:true
+        }
+      );
+
+
+  if(
+    !error &&
+    data
+  ){
+
+    scheduleData = {};
+
+
+    data.forEach(
+      row => {
+
+        if(
+          !scheduleData[
+            row.date
+          ]
+        ){
+
+          scheduleData[
+            row.date
+          ] = [];
+
+        }
+
+
+        scheduleData[
+          row.date
+        ]
+        .push({
+
+          id:
+            row.id,
+
+          time:
+            row.time,
+
+          text:
+            row.content,
+
+          createdBy:
+            row.created_by,
+
+          reminderMinutes:
+            Number(row.reminder_minutes || 0)
+
+        });
+
+      }
+    );
+
+  }
+
+
+  renderCalendar();
+
+  renderSchedList();
+
+
+  sb
+    .channel(
+      'public:schedule_items'
+    )
+
+    .on(
+      'postgres_changes',
+
+      {
+        event:
+          '*',
+
+        schema:
+          'public',
+
+        table:
+          'schedule_items'
+      },
+
+      () =>
+        initSchedule()
+    )
+
+    .subscribe();
+
+}
+
+
+
+function canManage(createdBy){
+
+  return (
+    currentUser ===
+    ADMIN_NAME
+  )
+  ||
+  (
+    currentUser ===
+    createdBy
+  );
+
+}
+
+
+
+function renderCalendar(){
+
+  const calTitleElem =
+    document.getElementById(
+      'calTitle'
+    );
+
+
+  const calGridElem =
+    document.getElementById(
+      'calGrid'
+    );
+
+
+  if(
+    !calTitleElem ||
+    !calGridElem
+  )
+    return;
+
+
+  const y =
+    calDate.getFullYear();
+
+
+  const m =
+    calDate.getMonth();
+
+
+  calTitleElem.textContent =
+    `${y}년 ${m+1}월 📅`;
+
+
+  const first =
+    new Date(
+      y,
+      m,
+      1
+    )
+    .getDay();
+
+
+  const days =
+    new Date(
+      y,
+      m+1,
+      0
+    )
+    .getDate();
+
+
+  let html =
+    '<b>일</b><b>월</b><b>화</b><b>수</b><b>목</b><b>금</b><b>토</b>';
+
+
+  for(
+    let i=0;
+    i<first;
+    i++
+  ){
+
+    html +=
+      '<span></span>';
+
+  }
+
+
+  const realToday =
+    todayKey();
+
+
+  for(
+    let d=1;
+    d<=days;
+    d++
+  ){
+
+    const key =
+      dateKey(
+        y,
+        m,
+        d
+      );
+
+
+    let cls =
+      'day';
+
+
+    if(
+      key ===
+      realToday
+    )
+      cls +=
+        ' today';
+
+
+    if(
+      key ===
+      selectedDate
+    )
+      cls +=
+        ' selected';
+
+
+    if(
+      scheduleData[key] &&
+      scheduleData[key].length
+    )
+      cls +=
+        ' has';
+
+
+    html +=
+      `<span
+        class="${cls}"
+        onclick="selectDate('${key}')">
+
+        ${d}
+
+      </span>`;
+
+  }
+
+
+  calGridElem.innerHTML =
+    html;
+
+}
+
+
+
+function selectDate(key){
+
+  selectedDate =
+    key;
+
+
+  document
+    .getElementById(
+      'schedForm'
+    )
+    .style.display =
+      'none';
+
+
+  renderCalendar();
+
+  renderSchedList();
+
+}
+
+
+
+function renderSchedList(){
+
+  const labelElem =
+    document.getElementById(
+      'schedDateLabel'
+    );
+
+
+  const listElem =
+    document.getElementById(
+      'schedList'
+    );
+
+
+  if(
+    !labelElem ||
+    !listElem
+  )
+    return;
+
+
+  labelElem.textContent =
+    (
+      selectedDate ===
+      todayKey()
+
+        ? '오늘 일정 · '
+
+        : ''
+    )
+    +
+    fmtDate(
+      selectedDate
+    );
+
+
+  const list =
+    (
+      scheduleData[
+        selectedDate
+      ] || []
+    )
+    .slice()
+    .sort(
+      (a,b) =>
+        a.time.localeCompare(
+          b.time
+        )
+    );
+
+
+  listElem.innerHTML =
+    list.length
+
+      ? list.map(
+          it =>
+
+            `<div class="row">
+
+              <span class="time">
+                ${it.time}
+              </span>
+
+
+              <span
+                style="flex:1;cursor:pointer"
+                onclick="editSched(${it.id})">
+
+                ${it.text}
+
+              </span>
+
+
+              ${
+                canManage(
+                  it.createdBy
+                )
+
+                  ? `<button
+                      class="del"
+                      onclick="deleteSched(${it.id})">
+
+                      ✕
+
+                    </button>`
+
+                  : ''
+              }
+
+            </div>`
+        )
+        .join('')
+
+      :
+
+        '<div class="small" style="padding:10px 0">등록된 일정이 없어요.</div>';
+
+
+  renderHomeSchedule();
+
+}
+
+
+
+function toggleSchedForm(){
+
+  editingSchedId =
+    null;
+
+
+  document
+    .getElementById(
+      'schedTime'
+    )
+    .value =
+      '';
+
+
+  document
+    .getElementById(
+      'schedText'
+    )
+    .value =
+      '';
+
+  const reminderEl =
+    document.getElementById('schedReminder');
+  if(reminderEl)
+    reminderEl.value = '0';
+
+
+  const f =
+    document.getElementById(
+      'schedForm'
+    );
+
+
+  f.style.display =
+    f.style.display ===
+    'none'
+
+      ? 'block'
+
+      : 'none';
+
+}
+
+
+
+function editSched(id){
+
+  const it =
+    (
+      scheduleData[
+        selectedDate
+      ] || []
+    )
+    .find(
+      x =>
+        x.id ===
+        id
+    );
+
+
+  if(!it)
+    return;
+
+
+  editingSchedId =
+    id;
+
+
+  document
+    .getElementById(
+      'schedTime'
+    )
+    .value =
+      it.time;
+
+
+  document
+    .getElementById(
+      'schedText'
+    )
+    .value =
+      it.text;
+
+  const reminderEl =
+    document.getElementById('schedReminder');
+  if(reminderEl){
+    reminderEl.value = String(it.reminderMinutes || 0);
+  }
+
+
+  document
+    .getElementById(
+      'schedForm'
+    )
+    .style.display =
+      'block';
+
+}
+
+
+
+async function saveSched(){
+
+  const time =
+    document
+      .getElementById(
+        'schedTime'
+      )
+      .value ||
+    '00:00';
+
+
+  const text =
+    document
+      .getElementById(
+        'schedText'
+      )
+      .value
+      .trim();
+
+
+  if(!text)
+    return;
+
+  const reminderEl =
+    document.getElementById('schedReminder');
+  const reminderMinutes =
+    reminderEl ? Number(reminderEl.value || 0) : 0;
+
+  if(reminderMinutes > 0)
+    await requestReminderPermission();
+
+
+  document
+    .getElementById(
+      'schedForm'
+    )
+    .style.display =
+      'none';
+
+
+  if(editingSchedId){
+
+    const { error } =
+      await sb
+        .from('schedule_items')
+        .update({
+
+          time,
+
+          content:
+            text,
+
+          reminder_minutes:
+            reminderMinutes
+
+        })
+        .eq(
+          'id',
+          editingSchedId
+        );
+
+
+    if(error){
+
+      alert(
+        '일정 수정 실패: ' +
+        error.message
+      );
+
+      return;
+
+    }
+
+  }
+
+
+  else{
+
+    const { error } =
+      await sb
+        .from('schedule_items')
+        .insert([
+          {
+
+            date:
+              selectedDate,
+
+            time,
+
+            content:
+              text,
+
+            reminder_minutes:
+              reminderMinutes,
+
+            created_by:
+              currentUser,
+
+            source_type: null,
+            source_id: null
+
+          }
+        ]);
+
+
+    if(error){
+
+      alert(
+        '일정 저장 실패: ' +
+        error.message
+      );
+
+      return;
+
+    }
+
+  }
+
+
+  initSchedule();
+
+}
+
+
+
+async function deleteSched(id){
+
+  const it =
+    (
+      scheduleData[
+        selectedDate
+      ] || []
+    )
+    .find(
+      x =>
+        x.id ===
+        id
+    );
+
+
+  if(
+    it &&
+    !canManage(
+      it.createdBy
+    )
+  ){
+
+    alert(
+      '작성자 또는 관리자(아빠)만 삭제할 수 있어요.'
+    );
+
+    return;
+
+  }
+
+
+  const { error } =
+    await sb
+      .from('schedule_items')
+      .delete()
+      .eq(
+        'id',
+        id
+      );
+
+
+  if(error){
+
+    alert(
+      '삭제 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  initSchedule();
+
+}
+
+
+
+function renderHomeSchedule(){
+
+  const elem =
+    document.getElementById(
+      'homeSchedList'
+    );
+
+
+  if(!elem)
+    return;
+
+
+  const list =
+    (
+      scheduleData[
+        todayKey()
+      ] || []
+    )
+    .slice()
+    .sort(
+      (a,b) =>
+        a.time.localeCompare(
+          b.time
+        )
+    );
+
+
+  elem.innerHTML =
+    list.length
+
+      ? list.map(
+          it =>
+
+            `<div class="row">
+
+              <span class="time">
+                ${it.time}
+              </span>
+
+              ${it.text}
+
+            </div>`
+        )
+        .join('')
+
+      :
+
+        '<div class="small" style="padding:6px 0">오늘 등록된 일정이 없어요.</div>';
+
+}
+
+
+
+/* ===== 공지사항 ===== */
+
+let noticeData =
+  [];
+
+
+async function initNotice(){
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('notices')
+      .select('*')
+      .order(
+        'created_at',
+        {
+          ascending:false
+        }
+      );
+
+
+  if(
+    !error &&
+    data
+  )
+    noticeData =
+      data;
+
+
+  renderNotice();
+
+
+  sb
+    .channel(
+      'public:notices'
+    )
+
+    .on(
+      'postgres_changes',
+
+      {
+        event:
+          '*',
+
+        schema:
+          'public',
+
+        table:
+          'notices'
+      },
+
+      () =>
+        initNotice()
+    )
+
+    .subscribe();
+
+}
+
+
+
+function toggleNoticeForm(){
+
+  document
+    .getElementById(
+      'noticeTitle'
+    )
+    .value =
+      '';
+
+
+  document
+    .getElementById(
+      'noticeText'
+    )
+    .value =
+      '';
+
+
+  const f =
+    document.getElementById(
+      'noticeForm'
+    );
+
+
+  f.style.display =
+    f.style.display ===
+    'none'
+
+      ? 'block'
+
+      : 'none';
+
+}
+
+
+
+async function saveNotice(){
+
+  const title =
+    document
+      .getElementById(
+        'noticeTitle'
+      )
+      .value
+      .trim();
+
+
+  const text =
+    document
+      .getElementById(
+        'noticeText'
+      )
+      .value
+      .trim();
+
+
+  if(
+    !title ||
+    !text
+  )
+    return;
+
+
+  document
+    .getElementById(
+      'noticeForm'
+    )
+    .style.display =
+      'none';
+
+
+  const { error } =
+    await sb
+      .from('notices')
+      .insert([
+        {
+
+          title,
+
+          content:
+            text,
+
+
+          date:
+            todayKey(),
+
+          created_by:
+            currentUser
+
+        }
+      ]);
+
+
+  if(error){
+
+    alert(
+      '공지 등록 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  initNotice();
+
+}
+
+
+
+async function deleteNotice(id){
+
+  const n =
+    noticeData.find(
+      x =>
+        x.id ===
+        id
+    );
+
+
+  if(
+    n &&
+    !canManage(
+      n.created_by
+    )
+  ){
+
+    alert(
+      '작성자 또는 관리자(아빠)만 삭제할 수 있어요.'
+    );
+
+    return;
+
+  }
+
+
+  const { error } =
+    await sb
+      .from('notices')
+      .delete()
+      .eq(
+        'id',
+        id
+      );
+
+
+  if(error){
+
+    alert(
+      '삭제 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  initNotice();
+
+}
+
+
+
+function renderNotice(){
+
+  const listElem =
+    document.getElementById(
+      'noticeList'
+    );
+
+
+  const homeElem =
+    document.getElementById(
+      'homeNoticeBody'
+    );
+
+
+  if(
+    !listElem ||
+    !homeElem
+  )
+    return;
+
+
+  listElem.innerHTML =
+    noticeData.length
+
+      ? noticeData
+          .map(
+            n =>
+
+              `<div class="noticeitem">
+
+                <div class="top">
+
+                  <span class="datepill">
+
+                    ${fmtDate(n.date)}
+
+                  </span>
+
+
+                  ${
+                    canManage(
+                      n.created_by
+                    )
+
+                      ? `<button
+                          class="del"
+                          onclick="deleteNotice(${n.id})">
+
+                          ✕
+
+                        </button>`
+
+                      : ''
+                  }
+
+                </div>
+
+
+                <b>
+                  ${n.title}
+                </b>
+
+
+                <div
+                  class="small"
+                  style="margin-top:4px">
+
+                  ${n.content}
+
+                </div>
+
+              </div>`
+          )
+          .join('')
+
+      :
+
+        '<div class="small">등록된 공지가 없어요.</div>';
+
+
+  const first =
+    noticeData[0];
+
+
+  homeElem.innerHTML =
+    first
+
+      ? `<b>${first.title}</b>
+
+         <div
+           class="small"
+           style="margin-top:8px">
+
+           ${first.content}
+
+         </div>`
+
+      :
+
+        '<div class="small">등록된 공지가 없어요.</div>';
+
+}
+
+
+
+/* ===== 식단 ===== */
+
+let mealData =
+  {};
+
+
+async function initMeal(){
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('meals')
+      .select('*');
+
+
+  if(
+    !error &&
+    data
+  ){
+
+    mealData =
+      {};
+
+
+    data.forEach(
+      row => {
+
+        mealData[
+          row.date
+        ] =
+          {
+
+            menu:
+              row.menu,
+
+            side:
+              row.side,
+
+            createdBy:
+              row.created_by
+
+          };
+
+      }
+    );
+
+  }
+
+
+  renderMeal();
+
+
+  sb
+    .channel(
+      'public:meals'
+    )
+
+    .on(
+      'postgres_changes',
+
+      {
+        event:
+          '*',
+
+        schema:
+          'public',
+
+        table:
+          'meals'
+      },
+
+      () =>
+        initMeal()
+    )
+
+    .subscribe();
+
+}
+
+
+
+async function saveMeal(){
+
+  const menu =
+    document
+      .getElementById(
+        'mealMenu'
+      )
+      .value
+      .trim();
+
+
+  const side =
+    document
+      .getElementById(
+        'mealSide'
+      )
+      .value
+      .trim();
+
+
+  if(!menu)
+    return;
+
+
+  document
+    .getElementById(
+      'mealMenu'
+    )
+    .value =
+      '';
+
+
+  document
+    .getElementById(
+      'mealSide'
+    )
+    .value =
+      '';
+
+
+  const { error } =
+    await sb
+      .from('meals')
+      .upsert(
+        [
+          {
+
+            date:
+              todayKey(),
+
+            menu,
+
+            side,
+
+            created_by:
+              currentUser
+
+          }
+        ],
+
+        {
+          onConflict:
+            'date'
+        }
+      );
+
+
+  if(error){
+
+    alert(
+      '식단 저장 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  initMeal();
+
+}
+
+
+
+async function deleteMeal(date){
+
+  const m =
+    mealData[
+      date
+    ];
+
+
+  if(
+    m &&
+    !canManage(
+      m.createdBy
+    )
+  ){
+
+    alert(
+      '작성자 또는 관리자(아빠)만 삭제할 수 있어요.'
+    );
+
+    return;
+
+  }
+
+
+  const { error } =
+    await sb
+      .from('meals')
+      .delete()
+      .eq(
+        'date',
+        date
+      );
+
+
+  if(error){
+
+    alert(
+      '삭제 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  initMeal();
+
+}
+
+
+
+function renderMeal(){
+
+  const listElem =
+    document.getElementById(
+      'mealList'
+    );
+
+
+  const homeElem =
+    document.getElementById(
+      'homeMealBody'
+    );
+
+
+  if(
+    !listElem ||
+    !homeElem
+  )
+    return;
+
+
+  const keys =
+    Object
+      .keys(mealData)
+      .sort()
+      .reverse();
+
+
+  listElem.innerHTML =
+    keys.length
+
+      ? keys.map(
+          k =>
+
+            `<div class="mealitem">
+
+              <div class="top">
+
+                <span class="datepill">
+
+                  ${fmtDate(k)}
+
+                  ${
+                    k===todayKey()
+                      ? ' · 오늘'
+                      : ''
+                  }
+
+                </span>
+
+
+                ${
+                  canManage(
+                    mealData[k].createdBy
+                  )
+
+                    ? `<button
+                        class="del"
+                        onclick="deleteMeal('${k}')">
+
+                        ✕
+
+                      </button>`
+
+                    : ''
+                }
+
+              </div>
+
+
+              <b
+                style="display:block">
+
+                ${mealData[k].menu}
+
+              </b>
+
+
+              ${
+                mealData[k].side
+
+                  ? `<div class="small">
+
+                      ${mealData[k].side}
+
+                    </div>`
+
+                  : ''
+              }
+
+            </div>`
+        )
+        .join('')
+
+      :
+
+        '<div class="small">등록된 식단이 없어요.</div>';
+
+
+  const today =
+    mealData[
+      todayKey()
+    ];
+
+
+  homeElem.innerHTML =
+    today
+
+      ? `<div class="mealpic">
+           🍚 🥘
+         </div>
+
+         <b>
+           ${today.menu}
+         </b>
+
+         ${
+           today.side
+
+             ? `<div class="small">
+
+                 ${today.side}
+
+               </div>`
+
+             : ''
+         }`
+
+      :
+
+        '<div class="small" style="padding:12px 0">오늘 식단이 없어요. 눌러서 입력하기</div>';
+
+}
+
+
+
+/* ===== 가족 앨범 ===== */
+
+let photoList =
+  [];
+
+let currentPhotoIdx =
+  null;
+
+
+
+async function uploadPhoto(file){
+
+  if(
+    currentUser !==
+    ADMIN_NAME
+  ){
+
+    alert(
+      '사진 등록 권한이 없습니다.'
+    );
+
+    return;
+
+  }
+
+
+  if(!file)
+    return;
+
+
+  const path =
+    `album_${Date.now()}_${file.name}`;
+
+
+  const {error} =
+    await sb
+      .storage
+      .from(PHOTO_BUCKET)
+      .upload(
+        path,
+        file
+      );
+
+
+  document
+    .getElementById(
+      'photoInput'
+    )
+    .value =
+      '';
+
+
+  if(error){
+
+    alert(
+      '업로드 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  loadPhotos();
+
+}
+
+
+
+async function loadPhotos(){
+
+  try{
+
+    const {
+      data,
+      error
+    } =
+      await sb
+        .storage
+        .from(PHOTO_BUCKET)
+        .list(
+          '',
+          {
+            limit:100,
+
+            sortBy:{
+              column:'created_at',
+              order:'desc'
+            }
+          }
+        );
+
+
+    const gridElem =
+      document.getElementById(
+        'albumGrid'
+      );
+
+
+    const homePhotosElem =
+      document.getElementById(
+        'homePhotos'
+      );
+
+
+    if(error){
+
+      if(gridElem)
+        gridElem.innerHTML =
+          `<div class="small">
+            사진을 불러오지 못했어요
+          </div>`;
+
+      return;
+
+    }
+
+
+    photoList =
+      (data || [])
+
+      .filter(
+        f =>
+          f.name &&
+          !f.name.startsWith(
+            'chat_'
+          )
+      )
+
+      .map(
+        f =>
+          ({
+
+            name:
+              f.name,
+
+            url:
+              sb
+                .storage
+                .from(PHOTO_BUCKET)
+                .getPublicUrl(
+                  f.name
+                )
+                .data
+                .publicUrl
+
+          })
+      );
+
+
+    if(gridElem){
+
+      gridElem.innerHTML =
+        photoList.length
+
+          ? photoList
+              .map(
+                (p,i) =>
+
+                  `<div
+                    class="photo"
+                    style="
+                      background-image:
+                      url('${p.url}')
+                    "
+                    onclick="openLightbox(${i})">
+                  </div>`
+              )
+              .join('')
+
+          :
+
+            '<div class="small">아직 올라온 사진이 없어요.</div>';
+
+    }
+
+
+    if(homePhotosElem){
+
+      homePhotosElem.innerHTML =
+        photoList
+          .slice(0,3)
+
+          .map(
+            p =>
+
+              `<div
+                class="photo"
+                style="
+                  background-image:
+                  url('${p.url}')
+                ">
+              </div>`
+          )
+          .join('')
+
+        ||
+
+        '<div class="small">사진이 없어요</div>';
+
+    }
+
+  }
+
+
+  catch(e){
+
+    console.error(
+      '사진 로드 예외:',
+      e
+    );
+
+  }
+
+}
+
+
+
+function openLightbox(i){
+
+  currentPhotoIdx =
+    i;
+
+
+  const lbDeleteBtn =
+    document.getElementById(
+      'lbDeleteBtn'
+    );
+
+
+  if(lbDeleteBtn)
+    lbDeleteBtn.style.display =
+      (
+        currentUser ===
+        ADMIN_NAME
+      )
+
+        ? 'inline-block'
+
+        : 'none';
+
+
+  document
+    .getElementById(
+      'lightboxImg'
+    )
+    .src =
+      photoList[i].url;
+
+
+  document
+    .getElementById(
+      'lightbox'
+    )
+    .classList
+    .add('show');
+
+}
+
+
+
+function closeLightbox(){
+
+  document
+    .getElementById(
+      'lightbox'
+    )
+    .classList
+    .remove('show');
+
+
+  currentPhotoIdx =
+    null;
+
+}
+
+
+
+async function deleteCurrentPhoto(){
+
+  if(
+    currentUser !==
+    ADMIN_NAME
+  ){
+
+    alert(
+      '관리자(아빠)만 삭제 가능합니다.'
+    );
+
+    return;
+
+  }
+
+
+  if(
+    currentPhotoIdx ===
+    null
+  )
+    return;
+
+
+  const p =
+    photoList[
+      currentPhotoIdx
+    ];
+
+
+  if(
+    !confirm(
+      '이 사진을 삭제할까요?'
+    )
+  )
+    return;
+
+
+  const {error} =
+    await sb
+      .storage
+      .from(PHOTO_BUCKET)
+      .remove([
+        p.name
+      ]);
+
+
+  if(error){
+
+    alert(
+      '삭제 실패: ' +
+      error.message
+    );
+
+    return;
+
+  }
+
+
+  closeLightbox();
+
+  loadPhotos();
+
+}
+
+
+
+/* ===== 가족 GPS 위치 공유 + 카카오맵 ===== */
+
+let homeLocationMarkers = [];
+
+let kakaoMap =
+  null;
+
+let locationWatchId =
+  null;
+
+let isLocationSharing =
+  false;
+
+let locationMarkers =
+  {};
+
+let familyLocationData =
+  [];
+
+let locationRealtimeChannel =
+  null;
+
+const LOCATION_SHARING_KEY =
+  'woorijipLocationSharing';
+
+const LOCATION_ONLINE_MS =
+  5 * 60 * 1000;
+
+
+
+function isLocationOnline(t){
+
+  if(!t)
+    return false;
+
+
+  return (
+    Date.now() -
+    new Date(t).getTime()
+  ) < LOCATION_ONLINE_MS;
+
+}
+
+
+
+function myLastLocation(){
+
+  return familyLocationData.find(
+    x =>
+      x.user_name ===
+      currentUser
+  ) ||
+    null;
+
+}
+
+
+
+function updateLocationStatusUI(){
+
+  const s =
+    document.getElementById(
+      'locationStatus'
+    );
+
+  const b =
+    document.getElementById(
+      'locationShareBtn'
+    );
+
+  const meta =
+    document.getElementById(
+      'locationMeta'
+    );
+
+
+  if(b)
+    b.textContent =
+      isLocationSharing
+
+        ? '내 위치 공유 중지'
+
+        : '내 위치 공유 시작';
+
+
+  if(s)
+    s.textContent =
+      isLocationSharing
+
+        ? '🟢 위치 공유 중'
+
+        : '⚪ 공유 중지';
+
+
+  if(meta){
+
+    const mine =
+      myLastLocation();
+
+
+    meta.textContent =
+      mine
+
+        ? (
+            '마지막 위치 업데이트: ' +
+            formatLocationTime(
+              mine.updated_at
+            ) +
+            (
+              mine.accuracy
+
+                ? ' · 정확도 약 ' +
+                  Math.round(
+                    mine.accuracy
+                  ) +
+                  'm'
+
+                : ''
+            )
+          )
+
+        : '마지막 위치 업데이트: 정보 없음';
+
+  }
+
+}
+
+
+
+function updateLocationUserName(){
+
+  const e =
+    document.getElementById(
+      'locationUserName'
+    );
+
+
+  if(e)
+    e.textContent =
+      currentUser;
+
+}
+
+
+
+function formatLocationTime(t){
+
+  if(!t)
+    return
+      '업데이트 시간 없음';
+
+
+  const d =
+    Date.now() -
+    new Date(t).getTime();
+
+
+  if(
+    d < 60000
+  )
+    return
+      '방금 전';
+
+
+  const m =
+    Math.floor(
+      d / 60000
+    );
+
+
+  if(
+    m < 60
+  )
+    return
+      `${m}분 전`;
+
+
+  const h =
+    Math.floor(
+      m / 60
+    );
+
+
+  if(
+    h < 24
+  )
+    return
+      `${h}시간 전`;
+
+
+  return
+    `${Math.floor(h/24)}일 전`;
+
+}
+
+
+
+function getFamilyIcon(name){
+  const i=family.indexOf(name);
+  if(i>=0){
+    const src=profileSrc(i);
+    return src ? `<img class="avatar-img-marker" src="${src}" alt="">` : (icons[i]||'👤');
+  }
+  return '📍';
+}
+
+
+
+function toggleLocationSharing(){
+
+  isLocationSharing
+
+    ? stopLocationSharing()
+
+    : startLocationSharing();
+
+}
+
+
+
+function startLocationSharing(){
+
+  if(
+    !navigator.geolocation
+  ){
+
+    alert(
+      '이 기기에서는 GPS 위치 기능을 지원하지 않습니다.'
+    );
+
+    return;
+
+  }
+
+
+  const s =
+    document.getElementById(
+      'locationStatus'
+    );
+
+
+  if(s)
+    s.textContent =
+      'GPS 연결 중...';
+
+
+  if(
+    locationWatchId !==
+    null
+  ){
+
+    navigator
+      .geolocation
+      .clearWatch(
+        locationWatchId
+      );
+
+  }
+
+
+  locationWatchId =
+    navigator
+      .geolocation
+      .watchPosition(
+
+        async p => {
+
+          await saveMyLocation(
+            p.coords.latitude,
+            p.coords.longitude,
+            p.coords.accuracy
+          );
+
+
+          isLocationSharing =
+            true;
+
+
+          localStorage.setItem(
+            LOCATION_SHARING_KEY,
+            '1'
+          );
+
+
+          await loadFamilyLocations();
+
+          updateLocationStatusUI();
+
+        },
+
+
+        err => {
+
+          console.error(
+            'GPS 오류:',
+            err
+          );
+
+
+          let msg =
+            '위치를 가져오지 못했습니다.';
+
+
+          if(
+            err.code ===
+            err.PERMISSION_DENIED
+          ){
+
+            msg =
+              '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해 주세요.';
+
+          }
+
+
+          else if(
+            err.code ===
+            err.POSITION_UNAVAILABLE
+          ){
+
+            msg =
+              'GPS 위치 정보를 사용할 수 없습니다.';
+
+          }
+
+
+          else if(
+            err.code ===
+            err.TIMEOUT
+          ){
+
+            msg =
+              'GPS 위치 확인 시간이 초과되었습니다.';
+
+          }
+
+
+          alert(msg);
+
+          stopLocationSharing();
+
+        },
+
+
+        {
+          enableHighAccuracy:
+            true,
+
+          timeout:
+            15000,
+
+          maximumAge:
+            10000
+        }
+
+      );
+
+}
+
+
+
+function stopLocationSharing(){
+
+  if(
+    locationWatchId !== null &&
+    navigator.geolocation
+  ){
+
+    navigator
+      .geolocation
+      .clearWatch(
+        locationWatchId
+      );
+
+
+    locationWatchId =
+      null;
+
+  }
+
+
+  isLocationSharing =
+    false;
+
+
+  localStorage.setItem(
+    LOCATION_SHARING_KEY,
+    '0'
+  );
+
+
+  updateLocationStatusUI();
+
+}
+
+
+
+async function saveMyLocation(
+  latitude,
+  longitude,
+  accuracy
+){
+
+  const {error} =
+    await sb
+      .from('family_locations')
+      .upsert(
+
+        {
+
+          user_name:
+            currentUser,
+
+          latitude,
+
+          longitude,
+
+          accuracy,
+
+          updated_at:
+            new Date()
+              .toISOString()
+
+        },
+
+
+        {
+          onConflict:
+            'user_name'
+        }
+
+      );
+
+
+  if(error){
+
+    console.error(
+      '위치 저장 실패:',
+      error
+    );
+
+
+    showToast(
+      '위치 저장 실패: ' +
+      error.message
+    );
+
+  }
+
+}
+
+
+
+async function loadFamilyLocations(){
+
+  const {
+    data,
+    error
+  } =
+    await sb
+      .from('family_locations')
+      .select('*')
+      .order(
+        'updated_at',
+        {
+          ascending:false
+        }
+      );
+
+
+  if(error){
+
+    console.error(
+      '위치 불러오기 실패:',
+      error
+    );
+
+    return;
+
+  }
+
+
+  familyLocationData =
+    data || [];
+
+
+  renderLocationList();
+  renderHomeLocationDashboard();
+  updateHomeLocationMap();
+
+  updateLocationMarkers();
+
+  updateLocationStatusUI();
+
+}
+
+
+
+function makeMarkerContent(
+  icon,
+  name,
+  isMe
+){
+
+  return `
+    <div
+      style="
+        width:52px;
+        height:52px;
+        border-radius:50% 50% 50% 0;
+        background:#fff;
+        box-shadow:
+          0 6px 16px
+          rgba(30,45,70,.18);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        transform:rotate(-45deg);
+        font-size:22px;
+        border:
+          ${
+            isMe
+
+              ? '2.5px solid var(--blue)'
+
+              : '1px solid #e8ebf1'
+          }">
+
+      <span
+        style="
+          display:block;
+          transform:rotate(45deg)">
+
+        ${icon}
+
+      </span>
+
+    </div>
+  `;
+
+}
+
+
+
+function updateLocationMarkers(){
+
+  if(
+    !kakaoMap ||
+    !(
+      window.kakao &&
+      kakao.maps
+    )
+  )
+    return;
+
+
+  const names =
+    new Set(
+      familyLocationData.map(
+        x =>
+          x.user_name
+      )
+    );
+
+
+  Object
+    .keys(locationMarkers)
+    .forEach(
+      n => {
+
+        if(
+          !names.has(n)
+        ){
+
+          locationMarkers[n]
+            .setMap(null);
+
+
+          delete
+            locationMarkers[n];
+
+        }
+
+      }
+    );
+
+
+  const bounds =
+    new kakao.maps.LatLngBounds();
+
+
+  familyLocationData
+    .forEach(
+      loc => {
+
+        const pos =
+          new kakao.maps.LatLng(
+
+            Number(
+              loc.latitude
+            ),
+
+            Number(
+              loc.longitude
+            )
+
+          );
+
+
+        bounds.extend(pos);
+
+
+        if(
+          locationMarkers[
+            loc.user_name
+          ]
+        ){
+
+          locationMarkers[
+            loc.user_name
+          ]
+          .setPosition(pos);
+
+        }
+
+
+        else{
+
+          const o =
+            new kakao.maps.CustomOverlay({
+
+              position:
+                pos,
+
+              yAnchor:
+                1,
+
+              content:
+                makeMarkerContent(
+                  getFamilyIcon(
+                    loc.user_name
+                  ),
+
+                  loc.user_name,
+
+                  loc.user_name ===
+                    currentUser
+                )
+
+            });
+
+
+          o.setMap(
+            kakaoMap
+          );
+
+
+          locationMarkers[
+            loc.user_name
+          ] =
+            o;
+
+        }
+
+      }
+    );
+
+
+  if(
+    familyLocationData.length ===
+    1
+  ){
+
+    const x =
+      familyLocationData[0];
+
+
+    kakaoMap.setCenter(
+
+      new kakao.maps.LatLng(
+
+        Number(
+          x.latitude
+        ),
+
+        Number(
+          x.longitude
+        )
+
+      )
+
+    );
+
+
+    kakaoMap.setLevel(
+      4
+    );
+
+  }
+
+
+  else if(
+    familyLocationData.length >
+    1
+  ){
+
+    kakaoMap.setBounds(
+      bounds
+    );
+
+  }
+
+}
+
+
+
+function renderLocationList(){
+
+  const e =
+    document.getElementById(
+      'locationList'
+    );
+
+
+  if(!e)
+    return;
+
+
+  if(
+    !familyLocationData.length
+  ){
+
+    e.innerHTML =
+      `
+        <div class="listitem">
+
+          <span>
+
+            <b>
+              아직 공유 중인 가족 위치가 없어요.
+            </b>
+
+            <br>
+
+            <small>
+              가족 구성원이 위치 공유를 시작하면
+              여기에 표시됩니다.
+            </small>
+
+          </span>
+
+        </div>
+      `;
+
+
+    return;
+
+  }
+
+
+  e.innerHTML =
+    familyLocationData
+      .map(
+        x =>
+
+          `<div
+            class="listitem"
+            style="cursor:pointer"
+            onclick="
+              focusFamilyLocation(
+                '${x.user_name.replace(/'/g,"\\'")}'
+              )
+            ">
+
+            <span>
+
+              ${
+                isLocationOnline(
+                  x.updated_at
+                )
+
+                  ? '🟢'
+
+                  : '⚪'
+              }
+
+              ${getFamilyIcon(
+                x.user_name
+              )}
+
+              <b>
+                ${x.user_name}
+              </b>
+
+              ${
+                x.user_name ===
+                currentUser
+
+                  ? ' <span style="color:var(--blue);font-weight:800">(나)</span>'
+
+                  : ''
+              }
+
+              <br>
+
+              <small>
+
+                마지막 업데이트:
+
+                ${formatLocationTime(
+                  x.updated_at
+                )}
+
+                ${
+                  x.accuracy
+
+                    ? ' · 정확도 약 ' +
+                      Math.round(
+                        x.accuracy
+                      ) +
+                      'm'
+
+                    : ''
+                }
+
+              </small>
+
+            </span>
+
+
+            <span>
+              📍
+            </span>
+
+          </div>`
+      )
+      .join('');
+
+}
+
+
+
+function focusFamilyLocation(name){
+
+  if(!kakaoMap)
+    return;
+
+
+  const x =
+    familyLocationData.find(
+      v =>
+        v.user_name ===
+        name
+    );
+
+
+  if(!x)
+    return;
+
+
+  kakaoMap.setCenter(
+
+    new kakao.maps.LatLng(
+
+      Number(
+        x.latitude
+      ),
+
+      Number(
+        x.longitude
+      )
+
+    )
+
+  );
+
+
+  kakaoMap.setLevel(
+    3
+  );
+
+}
+
+
+
+function initLocationRealtime(){
+
+  if(
+    locationRealtimeChannel
+  )
+    return;
+
+
+  locationRealtimeChannel =
+    sb
+      .channel(
+        'public:family_locations'
+      )
+
+      .on(
+
+        'postgres_changes',
+
+        {
+          event:
+            '*',
+
+          schema:
+            'public',
+
+          table:
+            'family_locations'
+        },
+
+
+        () =>
+          loadFamilyLocations()
+
+      )
+
+      .subscribe();
+
+}
+
+
+
+function initKakaoMap(){
+
+  updateLocationUserName();
+
+
+  if(kakaoMap){
+
+    kakaoMap.relayout();
+
+    loadFamilyLocations();
+
+    return;
+
+  }
+
+
+  if(
+    window.kakao &&
+    window.kakao.maps
+  ){
+
+    kakao.maps.load(
+      () => {
+
+        kakaoMap =
+          new kakao.maps.Map(
+
+            document.getElementById(
+              'kakaoMap'
+            ),
+
+            {
+              center:
+                new kakao.maps.LatLng(
+                  37.1998,
+                  127.0710
+                ),
+
+              level:
+                6
+            }
+
+          );
+
+
+        loadFamilyLocations();
+
+      }
+    );
+
+  }
+
+}
+
+
+
+document.addEventListener(
+  'DOMContentLoaded',
+
+  () => {
+
+    document
+      .querySelectorAll('.tab')
+      .forEach(
+        b =>
+          b.onclick =
+            () =>
+              goToPage(
+                b.dataset.page
+              )
+      );
+
+
+    checkAdminPermissions();
+
+
+    fetchUnreadCounts();
+
+
+    renderFamily();
+
+
+    initSchedule();
+
+
+    initNotice();
+
+
+    initMeal();
+
+
+    initGroupChat();
+
+
+    initDmRealtime();
+
+
+    initLocationRealtime();
+
+
+    updateLocationUserName();
+
+
+    loadFamilyLocations();
+
+
+    if(
+      localStorage.getItem(
+        LOCATION_SHARING_KEY
+      ) === '1'
+    ){
+
+      startLocationSharing();
+
+    }
+
+    else{
+
+      updateLocationStatusUI();
+
+    }
+
+
+    loadPhotos();
+    initExtraPages();
+    checkScheduleReminders();
+    setHomeMode(localStorage.getItem('woorijipHomeMode') || 'background');
+    setTimeout(initHomeLocationMap, 400);
+
+  }
+
+);
+
+
+
+window.addEventListener(
+  'pagehide',
+
+  () => {
+
+    if(
+      locationWatchId !== null &&
+      navigator.geolocation
+    ){
+
+      navigator
+        .geolocation
+        .clearWatch(
+          locationWatchId
+        );
+
+    }
+
+  }
+
+);
+
+
+
+/* ===== PWA Service Worker 등록 ===== */
+
+if(
+  'serviceWorker' in
+  navigator
+){
+
+  window.addEventListener(
+    'load',
+
+    () => {
+
+      navigator
+        .serviceWorker
+        .register(
+          './sw.js'
+        )
+
+        .then(
+          () =>
+            console.log(
+              'PWA 준비 완료'
+            )
+        )
+
+        .catch(
+          error =>
+            console.error(
+              'Service Worker 등록 실패:',
+              error
+            )
+        );
+
+    }
+
+  );
+
+}
+
+updateHomeDate();
+setInterval(updateHomeDate, 60000);
+</script>
+
+</body>
+</html>
