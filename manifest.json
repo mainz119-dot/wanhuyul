@@ -1,13 +1,21 @@
 {
-  "name": "완후율",
+  "name": "완후율 - 우리 가족 앱",
   "short_name": "완후율",
-  "description": "우리 가족을 위한 가족 생활 앱",
-  "start_url": "./",
+  "description": "우리 가족의 오늘을 한눈에 - 채팅, 일정, 지도",
+  "start_url": "./?pwa=1",
   "scope": "./",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "window-controls-overlay"
+  ],
   "orientation": "portrait",
   "background_color": "#f5f7fb",
   "theme_color": "#2f6fed",
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
       "src": "./icon-192.png",
@@ -20,6 +28,38 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "가족 채팅",
+      "url": "./?page=chat",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "가족 지도",
+      "url": "./?page=map",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "가족 일정",
+      "url": "./?page=schedule",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
