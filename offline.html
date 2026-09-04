@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오프라인 - 완후율</title>
+<style>
+body{margin:0;background:#f5f7fb;font-family:system-ui,-apple-system,"Noto Sans KR";display:grid;place-items:center;min-height:100vh;text-align:center;color:#202124}
+.card{background:#fff;border:1px solid #e8ebf1;border-radius:22px;padding:32px 24px;box-shadow:0 6px 20px rgba(30,45,70,.08);max-width:360px}
+.icon{font-size:48px;margin-bottom:12px}
+h1{font-size:20px;margin:0 0 8px}
+p{font-size:14px;color:#6b7280;margin:0 0 16px;line-height:1.5}
+button{border:0;background:#2f6fed;color:#fff;border-radius:14px;padding:12px 18px;font-weight:800;cursor:pointer;width:100%}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">📶</div>
+  <h1>인터넷 연결이 없어요</h1>
+  <p>잠깐 연결이 끊겼어요.<br>이전에 본 가족 채팅과 일정은<br>앱을 다시 열면 자동으로 동기화돼요.</p>
+  <button onclick="location.reload()">다시 시도</button>
+  <button onclick="location.href='./'" style="margin-top:8px;background:#fff;color:#2f6fed;border:1px solid #e8ebf1">홈으로 가기</button>
+</div>
+</body>
+</html>
