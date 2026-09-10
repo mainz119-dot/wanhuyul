@@ -1,0 +1,414 @@
+name: Build 우리집 Android APK v6
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'manifest.json'
+      - 'sw.js'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Create Capacitor project files
+        shell: bash
+        run: |
+          cat > package.json <<'JSON'
+          {
+            "private": true,
+            "scripts": {
+              "build": "node scripts/prepare-web.mjs && node scripts/bundle-native.mjs"
+            },
+            "dependencies": {
+              "@capacitor/android": "8.5.1",
+              "@capacitor/cli": "8.5.1",
+              "@capacitor/core": "8.5.1",
+              "@capgo/background-geolocation": "8.4.5",
+              "esbuild": "0.25.9",
+              "typescript": "5.9.2"
+            }
+          }
+          JSON
+
+          cat > capacitor.config.ts <<'EOF2'
+          import type { CapacitorConfig } from '@capacitor/cli';
+
+          const config: CapacitorConfig = {
+            appId: 'com.woorijip.family',
+            appName: '우리집',
+            webDir: 'www',
+            android: {
+              useLegacyBridge: true,
+              adjustMarginsForEdgeToEdge: 'force'
+            }
+          };
+
+          export default config;
+          EOF2
+
+          mkdir -p scripts native
+
+          cat > scripts/prepare-web.mjs <<'EOF2'
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const root = process.cwd();
+          const out = path.join(root, 'www');
+
+          const excluded = new Set([
+            '.git',
+            '.github',
+            'android',
+            'www',
+            'node_modules',
+            'native',
+            'scripts',
+            'package.json',
+            'package-lock.json',
+            'capacitor.config.ts'
+          ]);
+
+          fs.rmSync(out, { recursive: true, force: true });
+          fs.mkdirSync(out, { recursive: true });
+
+          for (const name of fs.readdirSync(root)) {
+            if (excluded.has(name)) continue;
+
+            fs.cpSync(
+              path.join(root, name),
+              path.join(out, name),
+              { recursive: true }
+            );
+          }
+
+          const htmlPath = path.join(out, 'index.html');
+
+          if (fs.existsSync(htmlPath)) {
+            let html = fs.readFileSync(htmlPath, 'utf8');
+
+            if (!html.includes('native-bridge.js')) {
+              html = html.replace(
+                /<\/body>/i,
+                '<script type="module" src="./native-bridge.js"></script>\n</body>'
+              );
+            }
+
+            const nativeUiCss = `
+          <style id="native-android-safe-area">
+            /* Android edge-to-edge: keep the app content below the Samsung status bar.
+               The fixed scrim also protects content while the page is scrolled. */
+            body.native-android {
+              padding-top: max(env(safe-area-inset-top), 32px);
+            }
+            body.native-android::before {
+              content: '';
+              position: fixed;
+              left: 0;
+              right: 0;
+              top: 0;
+              height: max(env(safe-area-inset-top), 32px);
+              background: rgba(244,249,253,.98);
+              z-index: 2147483646;
+              pointer-events: none;
+            }
+            body.native-android #home {
+              min-height: calc(100dvh - 124px);
+            }
+            @media (max-width: 720px) {
+              body.native-android #home {
+                min-height: calc(100dvh - 124px);
+              }
+            }
+          </style>
+          `;
+            const nativeUiBridge = `
+          <script>
+          (() => {
+            document.body.classList.add('native-android');
+            const applyNativeLocation = async (detail) => {
+              if (!detail || !detail.user_name) return;
+              try {
+                // familyLocationData is a top-level let in the page, so updating
+                // window.familyLocationData would not update the real variable.
+                // Reloading from Supabase keeps every existing renderer in sync.
+                if (typeof window.loadFamilyLocations === 'function') {
+                  await window.loadFamilyLocations();
+                  return;
+                }
+              } catch (e) {
+                console.warn('native location reload', e);
+              }
+              try {
+                if (typeof window.renderLocationList === 'function') window.renderLocationList();
+                if (typeof window.renderHomeLocationDashboard === 'function') window.renderHomeLocationDashboard();
+                if (typeof window.updateHomeLocationMap === 'function') window.updateHomeLocationMap();
+                if (typeof window.updateLocationMarkers === 'function') window.updateLocationMarkers();
+                if (typeof window.updateLocationStatusUI === 'function') window.updateLocationStatusUI();
+              } catch (e) { console.warn('native location UI update', e); }
+            };
+            window.addEventListener('native-location-update', e => { applyNativeLocation(e.detail); });
+          })();
+          </script>
+          `;
+            html = html.replace(/<\/head>/i, nativeUiCss + '</head>');
+            html = html.replace(/<\/body>/i, nativeUiBridge + '</body>');
+            fs.writeFileSync(htmlPath, html);
+          }
+          EOF2
+
+          cat > scripts/bundle-native.mjs <<'EOF2'
+          import { build } from 'esbuild';
+
+          await build({
+            entryPoints: ['native/native-bridge.js'],
+            bundle: true,
+            format: 'esm',
+            platform: 'browser',
+            target: 'es2022',
+            outfile: 'www/native-bridge.js',
+            minify: false
+          });
+          EOF2
+
+          cat > scripts/patch-android.mjs <<'EOF2'
+          import fs from 'node:fs';
+
+          const manifestPath = 'android/app/src/main/AndroidManifest.xml';
+          let manifest = fs.readFileSync(manifestPath, 'utf8');
+
+          const permissions = [
+            'android.permission.ACCESS_COARSE_LOCATION',
+            'android.permission.ACCESS_FINE_LOCATION',
+            'android.permission.ACCESS_BACKGROUND_LOCATION',
+            'android.permission.FOREGROUND_SERVICE',
+            'android.permission.FOREGROUND_SERVICE_LOCATION',
+            'android.permission.POST_NOTIFICATIONS'
+          ];
+
+          for (const permission of permissions) {
+            if (!manifest.includes(`android:name="${permission}"`)) {
+              manifest = manifest.replace(
+                '<application',
+                `<uses-permission android:name="${permission}" />\n    <application`
+              );
+            }
+          }
+
+          fs.writeFileSync(manifestPath, manifest);
+
+          const activityPath = 'android/app/src/main/java/com/woorijip/family/MainActivity.java';
+          if (fs.existsSync(activityPath)) {
+            fs.writeFileSync(activityPath, `package com.woorijip.family;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+
+              final android.webkit.WebView webView = getBridge().getWebView();
+              if (webView != null) {
+                webView.setOnApplyWindowInsetsListener((view, insets) -> {
+                  final int statusBarTop = insets.getSystemWindowInsetTop();
+                  view.setPadding(0, statusBarTop, 0, 0);
+                  return insets;
+                });
+                webView.requestApplyInsets();
+              }
+            }
+          }
+          `);
+          }
+          EOF2
+
+          cat > native/native-bridge.js <<'EOF2'
+          import { BackgroundGeolocation } from '@capgo/background-geolocation';
+
+          const SUPABASE_URL = 'https://ogrqjrtulhrpuuqnymkh.supabase.co';
+          const SUPABASE_KEY = 'sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN';
+          const SETTINGS = 'family_location_settings';
+          const LOCATIONS = 'family_locations';
+
+          let started = false;
+          let lastSent = 0;
+
+          function name() {
+            return localStorage.getItem('woorijipMyName') || '';
+          }
+
+          async function sharingEnabled() {
+            const userName = name();
+            if (!userName) return false;
+
+            const response = await fetch(
+              `${SUPABASE_URL}/rest/v1/${SETTINGS}?user_name=eq.${encodeURIComponent(userName)}&select=sharing_enabled&limit=1`,
+              {
+                headers: {
+                  apikey: SUPABASE_KEY,
+                  Authorization: `Bearer ${SUPABASE_KEY}`
+                }
+              }
+            );
+
+            if (!response.ok) return false;
+
+            const data = await response.json();
+            return data?.[0]?.sharing_enabled === true;
+          }
+
+          async function sendLocation(location) {
+            const userName = name();
+            if (!userName) return;
+
+            const now = Date.now();
+
+            if (now - lastSent < 15000) return;
+            lastSent = now;
+
+            const body = {
+              user_name: userName,
+              latitude: Number(location.latitude),
+              longitude: Number(location.longitude),
+              accuracy: Number(location.accuracy || 0),
+              updated_at: new Date(
+                Number(location.time || now)
+              ).toISOString()
+            };
+
+            const response = await fetch(
+              `${SUPABASE_URL}/rest/v1/${LOCATIONS}`,
+              {
+                method: 'POST',
+                headers: {
+                  apikey: SUPABASE_KEY,
+                  Authorization: `Bearer ${SUPABASE_KEY}`,
+                  'Content-Type': 'application/json',
+                  Prefer: 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(body)
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error(`location http ${response.status}`);
+            }
+
+            try {
+              window.dispatchEvent(new CustomEvent('native-location-update', { detail: body }));
+            } catch (e) {
+              console.warn('location UI event', e);
+            }
+          }
+
+          async function start() {
+            if (started) return;
+            if (!(await sharingEnabled())) return;
+
+            await BackgroundGeolocation.requestPermissions({
+              permissions: [
+                'location',
+                'backgroundLocation',
+                'notification'
+              ]
+            });
+
+            await BackgroundGeolocation.start(
+              {
+                backgroundMessage:
+                  '우리집이 가족 위치를 업데이트하고 있어요.',
+                backgroundTitle:
+                  '우리집 가족 위치 공유',
+                requestPermissions: false,
+                stale: false,
+                distanceFilter: 10,
+                minIntervalMs: 30000,
+                networkFallback: true
+              },
+              async (location) => {
+                try {
+                  await sendLocation(location);
+                } catch (error) {
+                  console.warn('location send', error);
+                }
+              }
+            );
+
+            started = true;
+          }
+
+          async function stop() {
+            if (!started) return;
+
+            try {
+              await BackgroundGeolocation.stop();
+            } finally {
+              started = false;
+            }
+          }
+
+          async function refresh() {
+            if (await sharingEnabled()) {
+              await start();
+            } else {
+              await stop();
+            }
+          }
+
+          setInterval(() => {
+            refresh().catch(() => {});
+          }, 30000);
+
+          refresh().catch(() => {});
+
+          window.__nativeLocation = {
+            start,
+            stop,
+            refresh
+          };
+          EOF2
+
+          npm install
+          npm run build
+          npx cap add android
+          npx cap sync android
+          node scripts/patch-android.mjs
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: woorijip-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
