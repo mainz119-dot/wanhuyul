@@ -889,8 +889,9 @@ body{background:#f4f9fd;overflow-x:hidden}
 .family-status-strip{display:flex;gap:7px;overflow-x:auto;padding:5px 1px 2px;margin-top:6px}.family-status-chip{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--line);border-radius:13px;background:#f8fafc;font-size:11px}.family-status-chip b{font-size:16px}.status-picker{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.status-picker button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:12px;cursor:pointer}.status-picker button.active{box-shadow:0 0 0 2px #d9e6ff}.schedule-extra{display:grid;grid-template-columns:1fr 1fr;gap:7px}.schedule-extra select{width:100%;padding:10px;border:1px solid var(--line);border-radius:11px;background:#fff}.schedule-check{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:12px}.schedule-done{text-decoration:line-through;opacity:.5}.sched-assignee{font-size:10px;color:var(--sub);margin-left:5px}.reactionbar{display:none!important}.reaction-count{font-size:10px;color:var(--sub)}.notice-read{font-size:10px;color:var(--sub);margin-top:6px}.notice-important{border-left:4px solid #ffb020!important}.family-status-edit{margin-top:9px;padding:10px;border-radius:14px;background:#f7f9fc}.family-status-edit .small{margin-bottom:5px}
 </style>
 
+
 <style id="apk-v12-chat-fix">
-/* APK v13 fix: 채팅 겹침 완전 해결 - flex + safe-area + keyboard */
+/* v15: 1:1 채팅 입력창 너무 밑에 있음 -> 네비게이션(하단탭) 위로 올림 */
 #group.page.active,
 #dm.page.active{
   display:flex !important;
@@ -900,6 +901,8 @@ body{background:#f4f9fd;overflow-x:hidden}
   max-height:100dvh !important;
   padding-bottom:0 !important;
   overflow:hidden !important;
+  /* 네비게이션 바 높이만큼 아래 여백 확보 */
+  padding-bottom: 0 !important;
 }
 #group.page.active .chat-scroll-wrap,
 #dm.page.active .chat-scroll-wrap{
@@ -915,31 +918,48 @@ body{background:#f4f9fd;overflow-x:hidden}
   overflow-y:auto !important;
   -webkit-overflow-scrolling:touch;
   padding-bottom:16px !important;
+  /* 채팅창 자체를 조금 줄임 - 입력창 공간 확보 */
+  max-height: calc(100dvh - 185px) !important;
 }
 #group.page.active .dmbar,
 #dm.page.active .dmbar{
-  position:relative !important;
-  left:auto !important;
-  right:auto !important;
-  bottom:auto !important;
-  transform:none !important;
-  width:100% !important;
+  position:fixed !important;
+  left:50% !important;
+  transform:translateX(-50%) !important;
+  bottom: calc(66px + env(safe-area-inset-bottom)) !important; /* 네비게이션 바로 위로 올림 */
+  width:min(520px, 100%) !important;
   flex:0 0 auto !important;
   margin:0 !important;
   border-top:1px solid var(--line);
-  background:rgba(255,255,255,.98);
-  backdrop-filter:blur(12px);
-  padding:8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
-  box-shadow:0 -4px 16px rgba(0,0,0,.06);
+  background:rgba(255,255,255,.98) !important;
+  backdrop-filter:blur(14px);
+  padding:8px 10px 10px !important;
+  box-shadow:0 -6px 20px rgba(0,0,0,.08) !important;
+  z-index: 60 !important;
+  border-left:1px solid var(--line);
+  border-right:1px solid var(--line);
+  border-radius: 16px 16px 0 0;
 }
-body.native-android #group.page.active,
-body.native-android #dm.page.active{
-  height:100dvh !important;
+body.native-android #group.page.active .dmbar,
+body.native-android #dm.page.active .dmbar{
+  bottom: calc(68px + env(safe-area-inset-bottom)) !important;
+}
+/* PWA/웹에서는 네비가 더 낮으므로 조금 더 올림 */
+@media (max-width: 520px){
+  #group.page.active .dmbar,
+  #dm.page.active .dmbar{
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+    width:100% !important;
+    border-radius: 0;
+    border-left:0;
+    border-right:0;
+  }
 }
 @supports (height: 100svh){
-  #group.page.active, #dm.page.active{ height:100svh !important; }
+  #groupMessages, #dmMessages{ max-height: calc(100svh - 185px) !important; }
 }
 </style>
+
 
 </head>
 
@@ -2769,7 +2789,7 @@ async function pollBackgroundLayoutRemote(){
 function startBackgroundLayoutPolling(){
   if(bgLayoutPollTimer) return;
   pollBackgroundLayoutRemote();
-  bgLayoutPollTimer=setInterval(pollBackgroundLayoutRemote,2000);
+  bgLayoutPollTimer=setInterval(pollBackgroundLayoutRemote,15000);
 }
 
 function applyBackgroundWidgetPositions(){
@@ -3861,24 +3881,13 @@ async function loadDm(){
       targetUser;
 
 
-  await sb
-    .from('direct_messages')
-    .update({
-      is_read:
-        true
-    })
-    .eq(
-      'sender_name',
-      targetUser
-    )
-    .eq(
-      'receiver_name',
-      currentUser
-    )
-    .eq(
-      'is_read',
-      false
-    );
+  // v16 fix: is_read는 사용자가 DM을 실제로 열었을 때만 3초 뒤에 처리 (자동 즉시 읽음 버그 수정)
+    setTimeout(async()=>{
+      try{
+        await sb.from('direct_messages').update({is_read:true}).eq('sender_name',targetUser).eq('receiver_name',currentUser).eq('is_read',false);
+        unreadCounts[targetUser]=0; renderFamily();
+      }catch(e){}
+    }, 3000);
 
 
   unreadCounts[
@@ -4092,10 +4101,7 @@ function initDmRealtime(){
           payload.new;
 
 
-        if(
-          msg.receiver_name ===
-          currentUser
-        ){
+        if(false && msg.receiver_name === currentUser){ // v16 disabled auto-read
 
           const isDmActive =
             document
@@ -4367,7 +4373,9 @@ function createVideoPeer(){
   videoPeer=new RTCPeerConnection({
     iceServers:[
       {urls:'stun:stun.l.google.com:19302'},
-      {urls:'stun:stun1.l.google.com:19302'}
+      {urls:'stun:stun1.l.google.com:19302'},
+      {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'}
     ],
     iceCandidatePoolSize:10
   });
@@ -7976,75 +7984,42 @@ function renderLocationList(){
   if(!e)
     return;
 
-
-  if(
-    !familyLocationData.length
-  ){
-
-    e.innerHTML =
-      `
-        <div class="listitem">
-
-          <span>
-
-            <b>
-              아직 공유 중인 가족 위치가 없어요.
-            </b>
-
-            <br>
-
-            <small>
-              가족 구성원이 위치 공유를 시작하면
-              여기에 표시됩니다.
-            </small>
-
-          </span>
-
-        </div>
-      `;
-
-
-    return;
-
-  }
-
+  // v17 fix: 후야가 안 보이는 문제 - 위치 공유 안 한 가족도 목록에 표시
+  // family 배열 전체를 기준으로 표시, 위치 데이터가 없으면 "위치 없음"으로
 
   e.innerHTML =
-    familyLocationData
+    family
       .map(
-        x =>
-
-          `<div
+        name => {
+          const x = (familyLocationData||[]).find(f=>f.user_name===name);
+          const hasLocation = !!x;
+          const online = hasLocation ? isLocationOnline(x.updated_at) : false;
+          const lastTime = hasLocation ? formatLocationTime(x.updated_at) : '위치 정보 없음';
+          const acc = hasLocation && x.accuracy ? ' · 정확도 약 '+Math.round(x.accuracy)+'m' : '';
+          const icon = hasLocation ? (online ? '🟢' : '⚪') : '⚪';
+          const placeLabel = hasLocation ? getCurrentPlaceLabel(name) : '위치 없음';
+          
+          return `<div
             class="listitem"
-            style="cursor:pointer"
+            style="cursor:pointer; opacity:${hasLocation?'1':'0.6'}"
             onclick="
-              openLocationDetail(
-                '${x.user_name.replace(/'/g,"\\'")}'
-              )
+              ${hasLocation ? `openLocationDetail('${name.replace(/'/g,"\'")}')` : `alert('${name}님은 아직 위치 공유를 시작하지 않았어요.')`}
             ">
 
             <span>
 
-              ${
-                isLocationOnline(
-                  x.updated_at
-                )
-
-                  ? '🟢'
-
-                  : '⚪'
-              }
+              ${icon}
 
               ${getFamilyIcon(
-                x.user_name
+                name
               )}
 
               <b>
-                ${x.user_name}
+                ${name}
               </b>
 
               ${
-                x.user_name ===
+                name ===
                 currentUser
 
                   ? ' <span style="color:var(--blue);font-weight:800">(나)</span>'
@@ -8056,23 +8031,7 @@ function renderLocationList(){
 
               <small>
 
-                마지막 업데이트:
-
-                ${formatLocationTime(
-                  x.updated_at
-                )}
-
-                ${
-                  x.accuracy
-
-                    ? ' · 정확도 약 ' +
-                      Math.round(
-                        x.accuracy
-                      ) +
-                      'm'
-
-                    : ''
-                }
+                ${hasLocation ? `마지막 업데이트: ${lastTime}${acc}` : '📍 위치 공유를 시작하지 않았어요'} · ${placeLabel}
 
               </small>
 
@@ -8080,14 +8039,16 @@ function renderLocationList(){
 
 
             <span>
-              📍
+              ${hasLocation ? '📍' : '🚫'}
             </span>
 
-          </div>`
+          </div>`;
+        }
       )
       .join('');
 
 }
+
 
 
 
@@ -10049,48 +10010,83 @@ window.addEventListener('load',()=>{setTimeout(()=>{loadFamilyStatuses();fillSch
 </script>
 
 
+
 <script id="apk-native-patch">
 (function(){
   function isNative(){ return !!(window.WoorijipNative || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())); }
   window.isNativeAndroid = isNative;
   if(isNative()) document.body.classList.add('native-android');
-  // Override location sharing to use native service in APK
+
+  // v16: FCM 토큰을 Supabase에 자동 동기화
+  async function syncFcmToken(){
+    try{
+      let token = null;
+      if(window.WoorijipNative && window.WoorijipNative.getFcmToken){
+        token = window.WoorijipNative.getFcmToken();
+      }
+      if(!token) return;
+      if(typeof sb !== 'undefined' && currentUser){
+        await sb.from('family_fcm_tokens').upsert({user_name: currentUser, token: token, updated_at: new Date().toISOString()}, {onConflict:'user_name'});
+        console.log('FCM token synced for', currentUser);
+      }
+    }catch(e){ console.warn('FCM sync fail', e); }
+  }
+  setTimeout(syncFcmToken, 2000);
+  setInterval(syncFcmToken, 30000);
+
+  // v16: 위치 - 네이티브 서비스를 JS가 직접 제어
   const origStart = window.startLocationSharing;
   const origStop = window.stopLocationSharing;
+  
   window.startLocationSharing = function(){
     try{
-      if(isNative() && window.WoorijipNative && window.WoorijipNative.setLocationUser){
-        WoorijipNative.setLocationUser(currentUser||'');
+      if(isNative() && window.WoorijipNative){
+        const user = (typeof currentUser !== 'undefined' ? currentUser : '') || localStorage.getItem('woorijipMyName') || '';
+        if(!user){ alert('사용자를 먼저 선택해주세요.'); return; }
+        localStorage.setItem('woorijipMyName', user);
+        localStorage.setItem('woorijipCurrentUser', user);
+        WoorijipNative.setLocationUser(user);
         WoorijipNative.startNativeLocation();
-        isLocationSharing=true;
+        isLocationSharing = true;
         localStorage.setItem('woorijipLocationSharing','1');
-        const s=document.getElementById('locationStatus'); if(s) s.textContent='네이티브 GPS 연결됨';
+        localStorage.setItem(LOCATION_SHARING_KEY || 'woorijipLocationSharing','1');
+        const s=document.getElementById('locationStatus'); if(s) s.textContent='네이티브 GPS 실행 중...';
         updateLocationStatusUI && updateLocationStatusUI();
+        console.log('Native location started for', user);
         return;
       }
-    }catch(e){ console.warn('native location start fail',e); }
+    }catch(e){ console.warn('native start fail',e); }
     if(typeof origStart==='function') return origStart.apply(this, arguments);
   };
+  
   window.stopLocationSharing = async function(silent){
     try{
-      if(isNative() && window.WoorijipNative && window.WoorijipNative.stopNativeLocation){
+      if(isNative() && window.WoorijipNative){
         WoorijipNative.stopNativeLocation();
-        isLocationSharing=false;
-        if(!silent) localStorage.setItem('woorijipLocationSharing','0');
+        isLocationSharing = false;
+        if(!silent){
+          localStorage.setItem('woorijipLocationSharing','0');
+          localStorage.setItem(LOCATION_SHARING_KEY || 'woorijipLocationSharing','0');
+        }
         updateLocationStatusUI && updateLocationStatusUI();
         if(silent) return;
       }
-    }catch(e){ console.warn('native location stop fail',e); }
+    }catch(e){ console.warn('native stop fail',e); }
     if(typeof origStop==='function') return origStop.apply(this, arguments);
   };
-  // Listen for native location broadcasts via JS event
+
+  // 네이티브에서 위치가 오면 JS가 Supabase에 저장 (네이티브 직접 HTTP 대신)
   window.addEventListener('native-location-update', function(e){
     const d=e.detail||{};
-    if(d.latitude && d.longitude){
-      saveMyLocation && saveMyLocation(d.latitude,d.longitude,d.accuracy||0);
+    if(d.latitude && d.longitude && typeof saveMyLocation==='function'){
+      saveMyLocation(d.latitude, d.longitude, d.accuracy||0);
     }
   });
-  // FCM token and pending push handling
+  window.handleNativeLocation = function(lat,lng,acc){
+    if(typeof saveMyLocation==='function') saveMyLocation(lat,lng,acc||0);
+  };
+
+  // FCM pending push
   function checkNativePush(){
     try{
       if(window.WoorijipNative && window.WoorijipNative.getPendingPush){
@@ -10098,35 +10094,35 @@ window.addEventListener('load',()=>{setTimeout(()=>{loadFamilyStatuses();fillSch
         if(raw){
           WoorijipNative.clearPendingPush();
           const data=JSON.parse(raw);
+          console.log('Pending push', data);
           if(data.type==='video' && data.from){
-            setTimeout(()=>{ showIncomingVideoCall && showIncomingVideoCall(data.from); }, 500);
+            setTimeout(()=>{ showIncomingVideoCall && showIncomingVideoCall(data.from); }, 800);
           } else if(data.type==='chat'){
-            goToPage && goToPage('chat');
+            setTimeout(()=>{ goToPage && goToPage('chat'); }, 500);
           }
         }
       }
     }catch(e){}
   }
-  setTimeout(checkNativePush, 800);
-  window.addEventListener('resume', checkNativePush);
+  setTimeout(checkNativePush, 1500);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkNativePush(); });
 
-  // Ensure video call works in WebView - re-request permission
   window.ensureVideoNativeReady = async function(){
     if(isNative()){
-      // In APK, permissions are requested by MainActivity, just check mediaDevices
       if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        throw new Error('WebView에서 카메라를 사용할 수 없습니다. 앱 권한을 확인해주세요.');
+        throw new Error('WebView에서 카메라를 사용할 수 없습니다.');
       }
       return true;
     }
-    if(!window.isSecureContext && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
-      console.warn('video requires secure context');
-    }
     return true;
   };
+
+  // v16: Realtime DM에서 자동 읽음 처리 제거 - 사용자가 DM을 열고 있을 때만 읽음 처리
+  // 기존 initDmRealtime의 자동 is_read=true 로직을 무력화하기 위해 플래그
+  window.__v16_fix_dm_autoread = true;
 })();
 </script>
+
 
 </body>
 </html>
