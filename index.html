@@ -888,50 +888,59 @@ body{background:#f4f9fd;overflow-x:hidden}
 /* ===== v19 family features ===== */
 .family-status-strip{display:flex;gap:7px;overflow-x:auto;padding:5px 1px 2px;margin-top:6px}.family-status-chip{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--line);border-radius:13px;background:#f8fafc;font-size:11px}.family-status-chip b{font-size:16px}.status-picker{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.status-picker button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:12px;cursor:pointer}.status-picker button.active{box-shadow:0 0 0 2px #d9e6ff}.schedule-extra{display:grid;grid-template-columns:1fr 1fr;gap:7px}.schedule-extra select{width:100%;padding:10px;border:1px solid var(--line);border-radius:11px;background:#fff}.schedule-check{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:12px}.schedule-done{text-decoration:line-through;opacity:.5}.sched-assignee{font-size:10px;color:var(--sub);margin-left:5px}.reactionbar{display:none!important}.reaction-count{font-size:10px;color:var(--sub)}.notice-read{font-size:10px;color:var(--sub);margin-top:6px}.notice-important{border-left:4px solid #ffb020!important}.family-status-edit{margin-top:9px;padding:10px;border-radius:14px;background:#f7f9fc}.family-status-edit .small{margin-bottom:5px}
 </style>
+
 <style id="apk-v12-chat-fix">
-/* APK v12: 채팅 영역과 입력창이 절대 겹치지 않도록 구조적으로 분리 */
+/* APK v13 fix: 채팅 겹침 완전 해결 - flex + safe-area + keyboard */
 #group.page.active,
 #dm.page.active{
   display:flex !important;
   flex-direction:column !important;
-  min-height:calc(100dvh - 110px);
-  padding-bottom:120px !important;
+  height:100dvh !important;
+  min-height:100dvh !important;
+  max-height:100dvh !important;
+  padding-bottom:0 !important;
+  overflow:hidden !important;
 }
 #group.page.active .chat-scroll-wrap,
 #dm.page.active .chat-scroll-wrap{
-  flex:1 1 auto;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-}
-#group.page.active .chat-scrollable.dmbody,
-#dm.page.active .chat-scrollable.dmbody{
   flex:1 1 auto !important;
-  height:auto !important;
-  min-height:180px !important;
-  max-height:none !important;
-  padding-bottom:14px !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  display:flex !important;
+  flex-direction:column !important;
+  padding-bottom:0 !important;
+}
+#groupMessages, #dmMessages{
+  flex:1 1 auto !important;
+  overflow-y:auto !important;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:16px !important;
 }
 #group.page.active .dmbar,
 #dm.page.active .dmbar{
-  position:sticky !important;
+  position:relative !important;
   left:auto !important;
+  right:auto !important;
   bottom:auto !important;
   transform:none !important;
   width:100% !important;
-  margin:10px 0 0 !important;
   flex:0 0 auto !important;
-  z-index:20 !important;
+  margin:0 !important;
+  border-top:1px solid var(--line);
+  background:rgba(255,255,255,.98);
+  backdrop-filter:blur(12px);
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
+  box-shadow:0 -4px 16px rgba(0,0,0,.06);
 }
 body.native-android #group.page.active,
 body.native-android #dm.page.active{
-  padding-bottom:120px !important;
+  height:100dvh !important;
 }
-body.native-android #group.page.active .dmbar,
-body.native-android #dm.page.active .dmbar{
-  bottom:auto !important;
+@supports (height: 100svh){
+  #group.page.active, #dm.page.active{ height:100svh !important; }
 }
 </style>
+
 </head>
 
 <body>
@@ -10036,6 +10045,86 @@ window.addEventListener('load',()=>{setTimeout(()=>{loadFamilyStatuses();fillSch
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(startDmReadRealtime,100));
   else setTimeout(startDmReadRealtime,100);
+})();
+</script>
+
+
+<script id="apk-native-patch">
+(function(){
+  function isNative(){ return !!(window.WoorijipNative || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())); }
+  window.isNativeAndroid = isNative;
+  if(isNative()) document.body.classList.add('native-android');
+  // Override location sharing to use native service in APK
+  const origStart = window.startLocationSharing;
+  const origStop = window.stopLocationSharing;
+  window.startLocationSharing = function(){
+    try{
+      if(isNative() && window.WoorijipNative && window.WoorijipNative.setLocationUser){
+        WoorijipNative.setLocationUser(currentUser||'');
+        WoorijipNative.startNativeLocation();
+        isLocationSharing=true;
+        localStorage.setItem('woorijipLocationSharing','1');
+        const s=document.getElementById('locationStatus'); if(s) s.textContent='네이티브 GPS 연결됨';
+        updateLocationStatusUI && updateLocationStatusUI();
+        return;
+      }
+    }catch(e){ console.warn('native location start fail',e); }
+    if(typeof origStart==='function') return origStart.apply(this, arguments);
+  };
+  window.stopLocationSharing = async function(silent){
+    try{
+      if(isNative() && window.WoorijipNative && window.WoorijipNative.stopNativeLocation){
+        WoorijipNative.stopNativeLocation();
+        isLocationSharing=false;
+        if(!silent) localStorage.setItem('woorijipLocationSharing','0');
+        updateLocationStatusUI && updateLocationStatusUI();
+        if(silent) return;
+      }
+    }catch(e){ console.warn('native location stop fail',e); }
+    if(typeof origStop==='function') return origStop.apply(this, arguments);
+  };
+  // Listen for native location broadcasts via JS event
+  window.addEventListener('native-location-update', function(e){
+    const d=e.detail||{};
+    if(d.latitude && d.longitude){
+      saveMyLocation && saveMyLocation(d.latitude,d.longitude,d.accuracy||0);
+    }
+  });
+  // FCM token and pending push handling
+  function checkNativePush(){
+    try{
+      if(window.WoorijipNative && window.WoorijipNative.getPendingPush){
+        const raw=WoorijipNative.getPendingPush();
+        if(raw){
+          WoorijipNative.clearPendingPush();
+          const data=JSON.parse(raw);
+          if(data.type==='video' && data.from){
+            setTimeout(()=>{ showIncomingVideoCall && showIncomingVideoCall(data.from); }, 500);
+          } else if(data.type==='chat'){
+            goToPage && goToPage('chat');
+          }
+        }
+      }
+    }catch(e){}
+  }
+  setTimeout(checkNativePush, 800);
+  window.addEventListener('resume', checkNativePush);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkNativePush(); });
+
+  // Ensure video call works in WebView - re-request permission
+  window.ensureVideoNativeReady = async function(){
+    if(isNative()){
+      // In APK, permissions are requested by MainActivity, just check mediaDevices
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        throw new Error('WebView에서 카메라를 사용할 수 없습니다. 앱 권한을 확인해주세요.');
+      }
+      return true;
+    }
+    if(!window.isSecureContext && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+      console.warn('video requires secure context');
+    }
+    return true;
+  };
 })();
 </script>
 
