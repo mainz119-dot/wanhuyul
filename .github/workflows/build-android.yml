@@ -1,4 +1,4 @@
-name: Build 우리집 Android APK v13.3 - Native GPS
+name: Build 우리집 Android APK v13.5 - Native GPS
 
 on:
   workflow_dispatch:
@@ -68,6 +68,17 @@ jobs:
           npm run build
           npx cap add android
           npx cap sync android
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('android/build.gradle'); s=root.read_text()
+          if 'com.google.gms:google-services' not in s:
+            s=s.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.3'", 1)
+          root.write_text(s)
+          app=Path('android/app/build.gradle'); s=app.read_text()
+          if 'com.google.gms.google-services' not in s:
+            s += "\napply plugin: 'com.google.gms.google-services'\n"
+          app.write_text(s)
+          PY
           mkdir -p android/app
           echo 'eyJwcm9qZWN0X2luZm8iOnsicHJvamVjdF9udW1iZXIiOiIzOTM4Nzc4NTcyMzgiLCJwcm9qZWN0X2lkIjoid29vcmlqaXBmYW1pbHkiLCJzdG9yYWdlX2J1Y2tldCI6Indvb3JpamlwZmFtaWx5LmZpcmViYXNlc3RvcmFnZS5hcHAifSwiY2xpZW50IjpbeyJjbGllbnRfaW5mbyI6eyJtb2JpbGVzZGtfYXBwX2lkIjoiMTozOTM4Nzc4NTcyMzg6YW5kcm9pZDozYWFlZDliN2RlNTIyNDk0MTBiYTc3IiwiYW5kcm9pZF9jbGllbnRfaW5mbyI6eyJwYWNrYWdlX25hbWUiOiJjb20ud29vcmlqaXAuZmFtaWx5In19LCJvYXV0aF9jbGllbnQiOltdLCJhcGlfa2V5IjpbeyJjdXJyZW50X2tleSI6IkFJemFTeUJVYmlVUFk1elBteWpJOFdFalRDZmJpeTBIOWd5T0YxcyJ9XSwic2VydmljZXMiOnsiYXBwaW52aXRlX3NlcnZpY2UiOnsib3RoZXJfcGxhdGZvcm1fb2F1dGhfY2xpZW50IjpbXX19fV0sImNvbmZpZ3VyYXRpb25fdmVyc2lvbiI6IjEifQ==' | base64 --decode > android/app/google-services.json
 
@@ -123,12 +134,14 @@ jobs:
           fs.writeFileSync(m,s);
           EOF2
           node scripts/patch-android.mjs
-          # add play-services-location dependency
+          # add native Android dependencies (GPS + Firebase Cloud Messaging)
           python3 - <<'PY'
           from pathlib import Path
           p=Path('android/app/build.gradle'); s=p.read_text()
           if 'play-services-location' not in s:
             s += "\ndependencies { implementation 'com.google.android.gms:play-services-location:21.3.0' }\n"
+          if 'firebase-messaging' not in s:
+            s += "\ndependencies { implementation 'com.google.firebase:firebase-messaging:24.1.0' }\n"
           p.write_text(s)
           PY
       - name: Build Debug APK
@@ -138,6 +151,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: 우리집-debug-v13.3-native-gps
+          name: 우리집-debug-v13.5-native-gps
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
