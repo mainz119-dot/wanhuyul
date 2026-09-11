@@ -4448,6 +4448,15 @@ async function startVideoCall(){
     createVideoPeer();
     openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
     sendVideoSignal({type:'invite',from:currentUser,to:name});
+    // v18: 앱이 꺼져있어도 푸시가 가도록 Edge Function 직접 호출
+    try{
+      fetch('https://ogrqjrtulhrpuuqnymkh.supabase.co/functions/v1/send-push', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({record:{sender_name:currentUser, receiver_name:name, content:'영상통화'}, type:'video'})
+      }).catch(()=>{});
+    }catch(e){}
+
   }catch(e){
     cleanupVideoCall();
   }
@@ -7160,6 +7169,17 @@ function myLastLocation(){
 
 
 function updateLocationStatusUI(){
+  // v18 patch: 항상 최신 상태 반영
+  try{
+    const btn=document.getElementById('locationShareBtn');
+    const status=document.getElementById('locationStatus');
+    const enabled=isFamilyLocationSharingEnabled(currentUser);
+    if(btn) btn.textContent = enabled ? '내 위치 공유 중지' : '내 위치 공유 시작';
+    if(status) status.textContent = enabled ? (isLocationSharing ? '🟢 공유 중' : '🟡 GPS 연결 중...') : '⚪ 공유 중지';
+  }catch(e){}
+}
+function updateLocationStatusUI_original(){
+
 
   const s =
     document.getElementById(
@@ -7445,6 +7465,17 @@ function updateLocationSharePermissionUI(){
 }
 
 function updateLocationStatusUI(){
+  // v18 patch: 항상 최신 상태 반영
+  try{
+    const btn=document.getElementById('locationShareBtn');
+    const status=document.getElementById('locationStatus');
+    const enabled=isFamilyLocationSharingEnabled(currentUser);
+    if(btn) btn.textContent = enabled ? '내 위치 공유 중지' : '내 위치 공유 시작';
+    if(status) status.textContent = enabled ? (isLocationSharing ? '🟢 공유 중' : '🟡 GPS 연결 중...') : '⚪ 공유 중지';
+  }catch(e){}
+}
+function updateLocationStatusUI_original(){
+
   const s=document.getElementById('locationStatus');
   const meta=document.getElementById('locationMeta');
   updateLocationSharePermissionUI();
@@ -7566,8 +7597,33 @@ function navigateToSelectedFamilyLocation(){
 }
 
 function toggleLocationSharing(){
-  alert('위치 공유 ON/OFF는 관리자만 「가족별 위치 공유 관리」에서 변경할 수 있어요.');
+  // v18 fix: 지도에서 바로 위치 공유 ON/OFF 가능하게 복구 + Supabase 설정도 같이 저장
+  if(!isFamilyLocationSharingEnabled(currentUser)){
+    // OFF -> ON
+    if(!confirm(currentUser+'님의 위치 공유를 시작할까요? 가족들에게 내 위치가 보여요.')) return;
+    saveLocationSharingSetting(currentUser, true).then(()=>{
+      startLocationSharing();
+    });
+  }else{
+    if(!confirm('위치 공유를 중지할까요?')) return;
+    saveLocationSharingSetting(currentUser, false).then(()=>{
+      stopLocationSharing(false);
+    });
+  }
 }
+
+async function saveLocationSharingSetting(userName, enabled){
+  try{
+    locationSharingSettings[userName]=enabled;
+    localStorage.setItem('woorijipLocationSharingSettings', JSON.stringify(locationSharingSettings));
+    const {error}=await sb.from(LOCATION_SETTINGS_TABLE).upsert({user_name:userName, sharing_enabled: enabled, updated_at: new Date().toISOString()}, {onConflict:'user_name'});
+    if(error) console.warn('위치 공유 설정 저장 실패', error);
+    renderLocationSharingManager();
+    await loadFamilyLocations();
+    updateLocationStatusUI();
+  }catch(e){ console.warn(e); }
+}
+
 
 function startLocationSharing(){
   if(!isFamilyLocationSharingEnabled(currentUser)){
