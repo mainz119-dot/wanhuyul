@@ -1,0 +1,143 @@
+name: Build 우리집 Android APK v13.2 - Native GPS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+          accept-android-sdk-licenses: true
+      - name: Create Capacitor project
+        shell: bash
+        run: |
+          set -e
+          cat > package.json <<'JSON'
+          {
+            "private": true,
+            "scripts": {"build":"node scripts/prepare-web.mjs && node scripts/bundle-native.mjs"},
+            "dependencies": {
+              "@capacitor/android":"8.5.1",
+              "@capacitor/cli":"8.5.1",
+              "@capacitor/core":"8.5.1",
+              "esbuild":"0.25.9",
+              "typescript":"5.9.2"
+            }
+          }
+          JSON
+          cat > capacitor.config.ts <<'EOF2'
+          import type { CapacitorConfig } from '@capacitor/cli';
+          const config: CapacitorConfig={appId:'com.woorijip.family',appName:'우리집',webDir:'www',android:{useLegacyBridge:true,adjustMarginsForEdgeToEdge:'force'}};
+          export default config;
+          EOF2
+          mkdir -p scripts native
+          cat > native/native-bridge.js <<'EOF2'
+          (()=>{
+            window.addEventListener('native-location-update',e=>{});
+          })();
+          EOF2
+          cat > scripts/prepare-web.mjs <<'EOF2'
+          import fs from 'node:fs'; import path from 'node:path';
+          const root=process.cwd(), out=path.join(root,'www');
+          const excluded=new Set(['.git','.github','android','www','node_modules','native','scripts','package.json','package-lock.json','capacitor.config.ts']);
+          fs.rmSync(out,{recursive:true,force:true}); fs.mkdirSync(out,{recursive:true});
+          for(const name of fs.readdirSync(root)){if(excluded.has(name))continue;fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true});}
+          const p=path.join(out,'index.html'); let html=fs.readFileSync(p,'utf8');
+          if(!html.includes('native-bridge.js')) html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');
+          fs.writeFileSync(p,html);
+          EOF2
+          cat > scripts/bundle-native.mjs <<'EOF2'
+          import {build} from 'esbuild'; await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
+          EOF2
+          npm install
+          npm run build
+          npx cap add android
+          npx cap sync android
+          mkdir -p android/app
+          echo 'ewogICJwcm9qZWN0X2luZm8iOiB7CiAgICAicHJvamVjdF9udW1iZXIiOiAiMzkzODc3ODU3MjM4IiwKICAgICJwcm9qZWN0X2lkIjogIndvb3JpamlwZmFtaWx5IiwKICAgICJzdG9yYWdlX2J1Y2tldCI6ICJ3b29yaWppcGZhbWlseS5maXJlYmFzZXN0b3JhZ2UuYXBwIgogIH0sCiAgImNsaWVudCI6IFsKICAgIHsKICAgICAgImNsaWVudF9pbmZvIjogewogICAgICAgICJtb2JpbGVzZGtfYXBwX2lkIjogIjE6MzkzODc3ODU3MjM4OmFuZHJvaWQ6M2FhZWQ5YjdkZTUyMjQ5NDEwYmE3NyIsCiAgICAgICAgImFuZHJvaWRfY2xpZW50X2luZm8iOiB7ImNwYWNrYWdlX25hbWUiOiAiY29tLndvb3JpamlwLmZhbWlseSJ9CiAgICAgIH0sCiAgICAgICJvYXV0aF9jbGllbnQiOiBbXSwKICAgICAgImFwaV9rZXkiOiBbeyJjdXJyZW50X2tleSI6ICJBSXphU3lCVWJpVVBZNXpQbXlqSThXRWpUQ2ZiaXkwSDlneU9GMXMiIH1dLAogICAgICAic2VydmljZXMiOiB7ImFwcGludml0ZV9zZXJ2aWNlIjp7Im90aGVyX3BsYXRmb3JtX29hdXRoX2NsaWVudCI6W119fQogICAgfQogIF0sCiAgImNvbmZpZ3VyYXRpb25fdmVyc2lvbiI6ICIxIgp9' | base64 --decode > android/app/google-services.json
+
+          cat > android/app/src/main/java/com/woorijip/family/MainActivity.java <<'EOF2'
+          package com.woorijip.family;
+          import android.Manifest; import android.content.*; import android.content.pm.PackageManager; import android.os.*; import android.webkit.*; import androidx.core.app.ActivityCompat; import androidx.core.content.ContextCompat; import com.getcapacitor.BridgeActivity; import com.google.firebase.messaging.FirebaseMessaging; import org.json.JSONObject;
+          public class MainActivity extends BridgeActivity {
+            static final int PERM=9001; static final String PREF="woorijip_native";
+            public class NativeBridge {
+              @JavascriptInterface public String getFcmToken(){return getSharedPreferences(PREF,0).getString("fcm_token","");}
+              @JavascriptInterface public String getPendingPush(){return getSharedPreferences(PREF,0).getString("pending_push","");}
+              @JavascriptInterface public void clearPendingPush(){getSharedPreferences(PREF,0).edit().remove("pending_push").apply();}
+              @JavascriptInterface public void setLocationUser(String u){getSharedPreferences(PREF,0).edit().putString("user_name",u).apply();}
+              @JavascriptInterface public void startNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",true).apply(); ContextCompat.startForegroundService(MainActivity.this,new Intent(MainActivity.this,NativeLocationService.class));}
+              @JavascriptInterface public void stopNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",false).apply(); stopService(new Intent(MainActivity.this,NativeLocationService.class));}
+            }
+            @Override public void onCreate(Bundle b){super.onCreate(b); requestPermissionsNow(); WebView w=getBridge().getWebView(); if(w!=null){w.getSettings().setGeolocationEnabled(true); w.setWebChromeClient(new WebChromeClient(){@Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback cb){ if("https://localhost".equals(origin)) cb.invoke(origin,true,false); else cb.invoke(origin,false,false); } @Override public void onPermissionRequest(PermissionRequest r){runOnUiThread(()->{boolean c=ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.CAMERA)==0;boolean m=ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.RECORD_AUDIO)==0;if(c&&m)r.grant(r.getResources());else r.deny();});}}); w.addJavascriptInterface(new NativeBridge(),"WoorijipNative"); FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->getSharedPreferences(PREF,0).edit().putString("fcm_token",t).apply());}}
+            void requestPermissionsNow(){java.util.ArrayList<String> a=new java.util.ArrayList<>();String[] p={Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO};for(String x:p)if(ContextCompat.checkSelfPermission(this,x)!=PackageManager.PERMISSION_GRANTED)a.add(x);if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)a.add(Manifest.permission.POST_NOTIFICATIONS);if(!a.isEmpty())ActivityCompat.requestPermissions(this,a.toArray(new String[0]),PERM);}
+          }
+          EOF2
+
+          cat > android/app/src/main/java/com/woorijip/family/NativeLocationService.java <<'EOF2'
+          package com.woorijip.family;
+          import android.Manifest; import android.app.*; import android.content.*; import android.content.pm.PackageManager; import android.os.*; import androidx.annotation.NonNull; import androidx.core.app.NotificationCompat; import com.google.android.gms.location.*; import java.io.*; import java.net.*; import org.json.*;
+          public class NativeLocationService extends Service {
+            static final String CH="woorijip_location"; FusedLocationProviderClient client; LocationCallback callback;
+            public int onStartCommand(Intent i,int flags,int id){createChannel(); if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return START_NOT_STICKY; startForeground(7001,new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("우리집 위치 공유").setContentText("가족 위치를 안전하게 업데이트하고 있어요").setOngoing(true).build()); start(); return START_STICKY;}
+            void createChannel(){if(Build.VERSION.SDK_INT>=26)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"우리집 위치 공유",NotificationManager.IMPORTANCE_LOW));}
+            void start(){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED&&checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopSelf();return;} client=LocationServices.getFusedLocationProviderClient(this); LocationRequest r=new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,15000).setMinUpdateIntervalMillis(8000).setMinUpdateDistanceMeters(10).build(); callback=new LocationCallback(){public void onLocationResult(@NonNull LocationResult lr){for(android.location.Location l:lr.getLocations())send(l.getLatitude(),l.getLongitude(),l.getAccuracy());}}; client.requestLocationUpdates(r,callback,Looper.getMainLooper()); client.getLastLocation().addOnSuccessListener(l->{if(l!=null)send(l.getLatitude(),l.getLongitude(),l.getAccuracy());});}
+            void send(double lat,double lng,float acc){try{android.content.SharedPreferences p=getSharedPreferences("woorijip_native",0);String u=p.getString("user_name","");if(u.isEmpty()||!p.getBoolean("location_enabled",false))return;URL url=new URL("https://ogrqjrtulhrpuuqnymkh.supabase.co/rest/v1/family_locations?on_conflict=user_name");HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("apikey","sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");c.setRequestProperty("Authorization","Bearer sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");c.setRequestProperty("Prefer","resolution=merge-duplicates");JSONObject o=new JSONObject();o.put("user_name",u);o.put("latitude",lat);o.put("longitude",lng);o.put("accuracy",acc);o.put("updated_at",new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",java.util.Locale.US).format(new java.util.Date()));OutputStream os=c.getOutputStream();os.write(o.toString().getBytes("UTF-8"));os.close();c.getResponseCode();c.disconnect();emit(lat,lng,acc); }catch(Exception e){android.util.Log.w("WoorijipGPS",e);}}
+            void emit(double lat,double lng,float acc){MainActivity a=null; try{android.webkit.WebView w=((MainActivity)getApplicationContext()).getBridge().getWebView();}catch(Exception ignored){} }
+            public void onDestroy(){if(client!=null&&callback!=null)client.removeLocationUpdates(callback);super.onDestroy();} public android.os.IBinder onBind(Intent i){return null;}
+          }
+          EOF2
+          # Fix service's app-context cast by using a WebView-independent broadcast; UI bridge listens in a later app build.
+          cat > android/app/src/main/java/com/woorijip/family/NativeLocationService.java.tmp <<'EOF2'
+          EOF2
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/java/com/woorijip/family/NativeLocationService.java')
+          s=p.read_text().replace('emit(lat,lng,acc); }catch(Exception e){','emit(lat,lng,acc); }catch(Exception e){')
+          s=s.replace('void emit(double lat,double lng,float acc){MainActivity a=null; try{android.webkit.WebView w=((MainActivity)getApplicationContext()).getBridge().getWebView();}catch(Exception ignored){} }','void emit(double lat,double lng,float acc){ Intent i=new Intent("com.woorijip.family.LOCATION_UPDATE"); i.putExtra("latitude",lat); i.putExtra("longitude",lng); i.putExtra("accuracy",acc); sendBroadcast(i); }')
+          p.write_text(s)
+          PY
+
+          cat > scripts/patch-android.mjs <<'EOF2'
+          import fs from 'node:fs';
+          const m='android/app/src/main/AndroidManifest.xml'; let s=fs.readFileSync(m,'utf8');
+          const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];
+          for(const p of perms) if(!s.includes('android.permission.'+p)) s=s.replace('<application','<uses-permission android:name="android.permission.'+p+'" />\n    <application');
+          s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n    </application>');
+          fs.writeFileSync(m,s);
+          EOF2
+          node scripts/patch-android.mjs
+          # add play-services-location dependency
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/build.gradle'); s=p.read_text()
+          if 'play-services-location' not in s:
+            s += "\ndependencies { implementation 'com.google.android.gms:play-services-location:21.3.0' }\n"
+          p.write_text(s)
+          PY
+      - name: Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 우리집-debug-v13.2-native-gps
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
