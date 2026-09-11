@@ -196,7 +196,7 @@ jobs:
               handlePushIntent(getIntent());
             }
 
-            @Override protected void onDestroy(){
+            @Override public void onDestroy(){
               try{ if(locationReceiver!=null) unregisterReceiver(locationReceiver); }catch(Exception ignored){}
               super.onDestroy();
             }
