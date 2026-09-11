@@ -171,11 +171,13 @@ jobs:
                     double lat=intent.getDoubleExtra("latitude",0);
                     double lng=intent.getDoubleExtra("longitude",0);
                     float acc=intent.getFloatExtra("accuracy",0);
-                    WebView web=null;
-                    try{ web=getBridge().getWebView(); }catch(Exception e){}
-                    if(web!=null){
-                      String js = String.format("try{window.handleNativeLocation && window.handleNativeLocation(%f,%f,%f); window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}", lat,lng,acc, lat,lng,acc);
-                      web.post(()-> web.evaluateJavascript(js, null));
+                    WebView webViewTmp=null;
+                    try{ webViewTmp=getBridge().getWebView(); }catch(Exception e){}
+                    if(webViewTmp!=null){
+                      String jsTmp = String.format("try{window.handleNativeLocation && window.handleNativeLocation(%f,%f,%f); window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}", lat,lng,acc, lat,lng,acc);
+                      final WebView fWeb = webViewTmp;
+                      final String fJs = jsTmp;
+                      fWeb.post(()-> fWeb.evaluateJavascript(fJs, null));
                     }
                   }
                 }
