@@ -1,5 +1,5 @@
 
-name: Build 우리집 Android APK v14 - Full Fix (GPS/Video/Push)
+name: Build 우리집 Android APK v16 - Full Fix Crash+Location+Video
 
 on:
   workflow_dispatch:
@@ -114,6 +114,7 @@ jobs:
           public class MainActivity extends BridgeActivity {
             static final int PERM=9001;
             static final String PREF="woorijip_native";
+            private BroadcastReceiver locationReceiver;
 
             public class NativeBridge {
               @JavascriptInterface public String getFcmToken(){return getSharedPreferences(PREF,0).getString("fcm_token","");}
@@ -122,12 +123,12 @@ jobs:
               @JavascriptInterface public void setLocationUser(String u){
                 getSharedPreferences(PREF,0).edit().putString("user_name",u).apply();
                 getSharedPreferences("woorijip_prefs",0).edit().putString("current_user",u).apply();
-                android.util.Log.i("WoorijipNative","setLocationUser: "+u);
+                getSharedPreferences(PREF,0).edit().putString("current_user",u).apply();
               }
               @JavascriptInterface public void startNativeLocation(){
                 getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",true).apply();
                 try{ ContextCompat.startForegroundService(MainActivity.this,new Intent(MainActivity.this,NativeLocationService.class)); }
-                catch(Exception e){ android.util.Log.e("WoorijipNative","startNativeLocation",e); }
+                catch(Exception e){ android.util.Log.e("WoorijipNative","start",e); }
               }
               @JavascriptInterface public void stopNativeLocation(){
                 getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",false).apply();
@@ -138,55 +139,66 @@ jobs:
             @Override public void onCreate(Bundle b){
               super.onCreate(b);
               requestPermissionsNow();
-              WebView w=getBridge().getWebView();
+              WebView w=null;
+              try{ w=getBridge().getWebView(); }catch(Exception e){ android.util.Log.w("MainActivity","getWebView",e); }
               if(w!=null){
-                w.getSettings().setGeolocationEnabled(true);
-                w.getSettings().setDatabaseEnabled(true);
-                w.getSettings().setDomStorageEnabled(true);
-                w.getSettings().setMediaPlaybackRequiresUserGesture(false);
-                w.getSettings().setJavaScriptEnabled(true);
+                try{
+                  w.getSettings().setGeolocationEnabled(true);
+                  w.getSettings().setDatabaseEnabled(true);
+                  w.getSettings().setDomStorageEnabled(true);
+                  w.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                  w.getSettings().setJavaScriptEnabled(true);
+                  w.getSettings().setAllowFileAccess(true);
+                }catch(Exception e){}
 
                 w.setWebChromeClient(new WebChromeClient(){
                   @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback){
-                    // FIX: Allow all https://localhost and capacitor:// origins for GPS
-                    if(origin!=null && (origin.contains("localhost") || origin.startsWith("https://") || origin.startsWith("capacitor://") || origin.startsWith("http://"))){
-                      callback.invoke(origin,true,false);
-                    } else {
-                      callback.invoke(origin,true,false);
-                    }
+                    callback.invoke(origin,true,false);
                   }
                   @Override public void onPermissionRequest(PermissionRequest request){
                     runOnUiThread(()->{
-                      // FIX: Grant camera/mic without delay if permissions already granted
-                      String[] resources = request.getResources();
-                      boolean grant = true;
-                      for(String r: resources){
-                        if(r.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)){
-                          if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) grant=false;
-                        }
-                        if(r.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)){
-                          if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) grant=false;
-                        }
-                      }
-                      if(grant){
-                        request.grant(resources);
-                      } else {
-                        // Request missing perms then grant
-                        requestPermissionsNow();
-                        // Grant anyway - system will prompt
-                        request.grant(resources);
-                      }
+                      try{ request.grant(request.getResources()); }catch(Exception e){ try{ request.deny(); }catch(Exception ignored){} }
                     });
                   }
                 });
                 w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");
+              }
+
+              // Location broadcast receiver -> forward to WebView JS
+              locationReceiver = new BroadcastReceiver(){
+                @Override public void onReceive(Context ctx, Intent intent){
+                  if("com.woorijip.family.LOCATION_UPDATE".equals(intent.getAction())){
+                    double lat=intent.getDoubleExtra("latitude",0);
+                    double lng=intent.getDoubleExtra("longitude",0);
+                    float acc=intent.getFloatExtra("accuracy",0);
+                    WebView web=null;
+                    try{ web=getBridge().getWebView(); }catch(Exception e){}
+                    if(web!=null){
+                      String js = String.format("try{window.handleNativeLocation && window.handleNativeLocation(%f,%f,%f); window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}", lat,lng,acc, lat,lng,acc);
+                      web.post(()-> web.evaluateJavascript(js, null));
+                    }
+                  }
+                }
+              };
+              try{
+                if(Build.VERSION.SDK_INT>=33){
+                  registerReceiver(locationReceiver, new IntentFilter("com.woorijip.family.LOCATION_UPDATE"), Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                  registerReceiver(locationReceiver, new IntentFilter("com.woorijip.family.LOCATION_UPDATE"));
+                }
+              }catch(Exception e){ android.util.Log.w("MainActivity","registerReceiver",e); }
+
+              try{
                 FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->{
                   getSharedPreferences(PREF,0).edit().putString("fcm_token",t).apply();
-                  android.util.Log.i("WoorijipFCM","Token: "+t);
                 });
-                // Handle intent from push
-                handlePushIntent(getIntent());
-              }
+              }catch(Exception e){}
+              handlePushIntent(getIntent());
+            }
+
+            @Override protected void onDestroy(){
+              try{ if(locationReceiver!=null) unregisterReceiver(locationReceiver); }catch(Exception ignored){}
+              super.onDestroy();
             }
 
             @Override protected void onNewIntent(Intent intent){
@@ -216,7 +228,6 @@ jobs:
               String[] perms={
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO
               };
@@ -225,15 +236,18 @@ jobs:
                 list.add(Manifest.permission.POST_NOTIFICATIONS);
               }
               if(!list.isEmpty()){
-                ActivityCompat.requestPermissions(this, list.toArray(new String[0]), PERM);
+                try{ ActivityCompat.requestPermissions(this, list.toArray(new String[0]), PERM); }catch(Exception e){}
               }
-            }
-
-            @Override public void onRequestPermissionsResult(int code, String[] perms, int[] results){
-              super.onRequestPermissionsResult(code, perms, results);
-              if(code==PERM){
-                WebView w=getBridge()!=null?getBridge().getWebView():null;
-                if(w!=null) w.reload();
+              // Background location은 별도로 나중에 요청 (Android 11+에서 한번에 요청하면 거부됨)
+              if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+                // 3초 뒤에 별도 요청
+                new Handler(Looper.getMainLooper()).postDelayed(()->{
+                  try{
+                    if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, PERM+1);
+                    }
+                  }catch(Exception e){}
+                }, 3000);
               }
             }
           }
@@ -325,7 +339,7 @@ jobs:
               if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
                 return START_NOT_STICKY;
               }
-              startForeground(7001,new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("우리집 위치 공유").setContentText("가족 위치를 안전하게 업데이트하고 있어요").setOngoing(true).build());
+              startForeground(7001,new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_menu_compass).setContentTitle("우리집 위치 공유").setContentText("가족 위치를 안전하게 업데이트하고 있어요").setOngoing(true).build());
               start();
               return START_STICKY;
             }
@@ -401,6 +415,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: 우리집-debug-v14-fullfix
+          name: 우리집-debug-v16-fullfix
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
