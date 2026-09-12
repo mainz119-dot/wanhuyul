@@ -1,4 +1,4 @@
-name: Build 우리집 Android APK v20 - buildfix6
+name: Build 우리집 Android APK v21 - realtime-push-video-fix
 
 on:
   workflow_dispatch:
@@ -166,7 +166,9 @@ jobs:
           .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:88px!important}
           #dmMessages.chat.chat-scrollable{height:calc(52dvh - 20px)!important;min-height:300px!important;max-height:520px!important}
           /* v20: 뭐할까 페이지가 하단 네비에 가려지지 않도록 충분한 하단 여백 */
-          #schedule{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;min-height:calc(100dvh - 100px);box-sizing:border-box}
+          #schedule{padding-bottom:calc(190px + env(safe-area-inset-bottom))!important;min-height:calc(100dvh - 100px);box-sizing:border-box}
+          #schedule .card:last-child{margin-bottom:70px!important}
+          @media(max-width:720px){#schedule{padding-bottom:calc(210px + env(safe-area-inset-bottom))!important}}
           #schedule .card:last-child{margin-bottom:40px}
           </style>`;
           const js=`
@@ -274,7 +276,7 @@ jobs:
                 }
                 return r;
               };
-              window.sendDm.__v20=true;
+              window.sendDm.__v21=true;
             }
 
             /* ---------- 영상통화: 동일한 전역 lexical 변수에 직접 연결 ---------- */
@@ -338,9 +340,15 @@ jobs:
               await initDmBroadcast();
               wrapDm();
               await ensureVideoChannel();
+              await pollDm();
             }
-            setTimeout(boot,1800);
-            setInterval(()=>{syncToken();wrapDm();initDmBroadcast();pollDm();},1500);
+            setTimeout(boot,1200);
+            setInterval(()=>{
+              syncToken();
+              wrapDm();
+              if(document.getElementById('dm')?.classList.contains('active')){ initDmBroadcast(); pollDm(); }
+              ensureVideoChannel();
+            },1000);
           })();
           </script>`;
           html=html.replace(/<\/body>/i,css+js+'\n</body>');
@@ -426,6 +434,8 @@ jobs:
           }
           EOF2
           node scripts/patch-android.mjs
+          grep -q 'woorijip-v20-fixes-js' www/index.html
+          grep -q 'window.sendDm.__v21' www/index.html
       - name: Build debug APK
         shell: bash
         run: |
@@ -435,6 +445,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: wanhuyul-apk-v20-buildfix6
+          name: wanhuyul-apk-v21-realtime-push-video-fix
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
