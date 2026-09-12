@@ -1,4 +1,4 @@
-name: Build 우리집 Android APK v21 - realtime-push-video-fix
+name: Build 우리집 Android APK v22 - push-video-systembar-fix
 
 on:
   workflow_dispatch:
@@ -162,6 +162,8 @@ jobs:
           let html=fs.readFileSync(htmlPath,'utf8');
           const css=`
           <style id="woorijip-v20-fixes">
+          /* v22-systembar-fix: Android 상태표시줄과 앱 콘텐츠 겹침 방지 */
+          html,body{padding-top:0!important;margin-top:0!important}
           /* v20: 채팅 입력창/하단 네비 겹침 방지 */
           .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:88px!important}
           #dmMessages.chat.chat-scrollable{height:calc(52dvh - 20px)!important;min-height:300px!important;max-height:520px!important}
@@ -399,7 +401,14 @@ jobs:
             @Override public void onCreate(Bundle b){super.onCreate(b);requestPermissionsNow();WebView w=null;try{w=getBridge().getWebView();}catch(Exception e){}if(w!=null){WebSettings st=w.getSettings();st.setJavaScriptEnabled(true);st.setDomStorageEnabled(true);st.setDatabaseEnabled(true);st.setGeolocationEnabled(true);st.setMediaPlaybackRequiresUserGesture(false);st.setAllowFileAccess(true);w.setWebChromeClient(new WebChromeClient(){
               @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback cb){if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)cb.invoke(origin,true,false);else{pendingGeoOrigin=origin;pendingGeoCallback=cb;ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},PERM+2);}}
               @Override public void onPermissionRequest(PermissionRequest r){runOnUiThread(()->handleWebPermission(r));}
-            });w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");}
+            });w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");
+              // v22-systembar-fix: 일부 Android 15/16 기기에서 Capacitor WebView가 상태표시줄 아래로 깔리는 문제를 직접 보정
+              try{
+                final int sid=getResources().getIdentifier("status_bar_height","dimen","android");
+                final int top=sid>0?getResources().getDimensionPixelSize(sid):0;
+                if(top>0) w.setPadding(w.getPaddingLeft(),top,w.getPaddingRight(),w.getPaddingBottom());
+              }catch(Exception ignored){}
+            }
               locationReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){if(!"com.woorijip.family.LOCATION_UPDATE".equals(i.getAction()))return;double lat=i.getDoubleExtra("latitude",0),lng=i.getDoubleExtra("longitude",0);float acc=i.getFloatExtra("accuracy",0);try{WebView v=getBridge().getWebView();if(v!=null){String js=String.format(java.util.Locale.US,"try{if(window.handleNativeLocation)window.handleNativeLocation(%f,%f,%f);window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}",lat,lng,acc,lat,lng,acc);v.post(()->v.evaluateJavascript(js,null));}}catch(Exception e){}}};
               try{if(Build.VERSION.SDK_INT>=33)registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"),Context.RECEIVER_NOT_EXPORTED);else registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"));}catch(Exception e){}
               try{FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->getSharedPreferences(PREF,0).edit().putString("fcm_token",t).apply());}catch(Exception e){}handlePushIntent(getIntent());}
@@ -415,9 +424,22 @@ jobs:
           package com.woorijip.family;
           import android.app.*;import android.content.*;import android.os.Build;import androidx.core.app.NotificationCompat;import com.google.firebase.messaging.FirebaseMessagingService;import com.google.firebase.messaging.RemoteMessage;import org.json.JSONObject;
           public class MyFirebaseService extends FirebaseMessagingService{
+            // v22-push-fix: FCM notification+data 대신 data 중심으로 수신하고 앱에서 직접 알림을 생성
             static final String CH="woorijip_push";
             @Override public void onNewToken(String t){super.onNewToken(t);getSharedPreferences("woorijip_native",0).edit().putString("fcm_token",t).apply();}
-            @Override public void onMessageReceived(RemoteMessage m){super.onMessageReceived(m);String title="완후율",body="새 메시지가 있어요",type="chat",from="";if(m.getNotification()!=null){if(m.getNotification().getTitle()!=null)title=m.getNotification().getTitle();if(m.getNotification().getBody()!=null)body=m.getNotification().getBody();}if(!m.getData().isEmpty()){if(m.getData().containsKey("title"))title=m.getData().get("title");if(m.getData().containsKey("body"))body=m.getData().get("body");if(m.getData().containsKey("type"))type=m.getData().get("type");if(m.getData().containsKey("from"))from=m.getData().get("from");}try{JSONObject o=new JSONObject();o.put("title",title);o.put("body",body);o.put("type",type);o.put("from",from);getSharedPreferences("woorijip_native",0).edit().putString("pending_push",o.toString()).apply();}catch(Exception ignored){}NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CH,"완후율 알림",NotificationManager.IMPORTANCE_HIGH));Intent i=new Intent(this,MainActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);i.putExtra("type",type);i.putExtra("from",from);i.putExtra("title",title);i.putExtra("body",body);PendingIntent pi=PendingIntent.getActivity(this,(int)(System.currentTimeMillis()&0x7fffffff),i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);NotificationCompat.Builder b=new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(pi);nm.notify((int)(System.currentTimeMillis()&0x7fffffff),b.build());}
+            @Override public void onMessageReceived(RemoteMessage m){
+              super.onMessageReceived(m);
+              String title="완후율",body="새 메시지가 있어요",type="chat",from="";
+              if(m.getNotification()!=null){if(m.getNotification().getTitle()!=null)title=m.getNotification().getTitle();if(m.getNotification().getBody()!=null)body=m.getNotification().getBody();}
+              if(!m.getData().isEmpty()){if(m.getData().containsKey("title"))title=m.getData().get("title");if(m.getData().containsKey("body"))body=m.getData().get("body");if(m.getData().containsKey("type"))type=m.getData().get("type");if(m.getData().containsKey("from"))from=m.getData().get("from");}
+              try{JSONObject o=new JSONObject();o.put("title",title);o.put("body",body);o.put("type",type);o.put("from",from);getSharedPreferences("woorijip_native",0).edit().putString("pending_push",o.toString()).apply();}catch(Exception ignored){}
+              NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+              if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CH,"완후율 알림",NotificationManager.IMPORTANCE_HIGH));
+              Intent i=new Intent(this,MainActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);i.putExtra("type",type);i.putExtra("from",from);i.putExtra("title",title);i.putExtra("body",body);
+              PendingIntent pi=PendingIntent.getActivity(this,(int)(System.currentTimeMillis()&0x7fffffff),i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+              NotificationCompat.Builder b=new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(type.equals("video")?NotificationCompat.CATEGORY_CALL:NotificationCompat.CATEGORY_MESSAGE).setAutoCancel(true).setContentIntent(pi);
+              nm.notify((int)(System.currentTimeMillis()&0x7fffffff),b.build());
+            }
           }
           EOF2
           cat > android/app/src/main/java/com/woorijip/family/NativeLocationService.java <<'EOF2'
@@ -436,6 +458,8 @@ jobs:
           node scripts/patch-android.mjs
           grep -q 'woorijip-v20-fixes-js' www/index.html
           grep -q 'window.sendDm.__v21' www/index.html
+          grep -q 'v22-systembar-fix' www/index.html
+          grep -q 'v22-push-fix' android/app/src/main/java/com/woorijip/family/MyFirebaseService.java
       - name: Build debug APK
         shell: bash
         run: |
@@ -445,6 +469,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: wanhuyul-apk-v21-realtime-push-video-fix
+          name: wanhuyul-apk-v22-push-video-systembar-fix
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
