@@ -115,10 +115,10 @@ jobs:
 
           html=html.replace(/(async function startVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'상대방의 응답을 기다리는 중…'\);\s*)sendVideoSignal\(\{type:'invite'/,
             `$1await initVideoCalling();
-    sendVideoSignal({type:'invite'`);
+          sendVideoSignal({type:'invite'`);
           html=html.replace(/(async function acceptVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'연결 중…'\);\s*)sendVideoSignal\(\{type:'accept'/,
             `$1await initVideoCalling();
-    sendVideoSignal({type:'accept'`);
+          sendVideoSignal({type:'accept'`);
 
           html=html.replace(/function showIncomingVideoCall\(name\)\{/, `function showIncomingVideoCall(name){
             if(!videoIncomingFrom) videoIncomingFrom=name;
