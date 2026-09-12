@@ -60,26 +60,105 @@ jobs:
           })();
           EOF2
           cat > scripts/prepare-web.mjs <<'EOF2'
-          import fs from 'node:fs';import path from 'node:path';
-          const root=process.cwd(),out=path.join(root,'www');const excluded=new Set(['.git','.github','android','www','node_modules','native','scripts','package.json','package-lock.json','capacitor.config.ts']);
-          fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});for(const name of fs.readdirSync(root)){if(excluded.has(name))continue;fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true})}
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root=process.cwd();
+          const out=path.join(root,'www');
+          const excluded=new Set(['.git','.github','android','www','node_modules','native','scripts','package.json','package-lock.json','capacitor.config.ts']);
+          fs.rmSync(out,{recursive:true,force:true});
+          fs.mkdirSync(out,{recursive:true});
+          for(const name of fs.readdirSync(root)){
+            if(excluded.has(name)) continue;
+            fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true});
+          }
           let html=fs.readFileSync(path.join(out,'index.html'),'utf8');
           html=html.replace(/<\/body>/i,'<style>/* v19 chat overlap fix */ .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:78px!important} #dmMessages.chat.chat-scrollable{height:calc(52dvh - 10px)!important;min-height:300px!important;max-height:520px!important}</style></body>');
-          // Video: wait for Realtime channel subscription and never drop early signals.
-          html=html.replace("let videoChannel = null;","let videoChannel = null;\nlet videoChannelReady = false;\nlet videoSignalQueue = [];\nlet videoChannelReadyWaiters = [];");
-          const oldInit=`async function initVideoCalling(){\n  try{\n    if(!sb || videoChannel) return;\n    videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });\n    videoChannel\n      .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))\n      .subscribe((status)=>{\n        if(status!=='SUBSCRIBED') console.warn('영상통화 채널 연결 상태:',status);\n      });\n  }catch(e){ console.warn('영상통화 초기화 실패:',e); }\n}`;
-          const newInit=`async function initVideoCalling(){\n  try{\n    if(!sb) return;\n    if(videoChannel && videoChannelReady) return;\n    videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });\n    videoChannelReady=false;\n    videoChannel\n      .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))\n      .subscribe((status)=>{\n        videoChannelReady=(status==='SUBSCRIBED');\n        if(videoChannelReady){\n          const q=videoSignalQueue.splice(0);\n          q.forEach(p=>{try{videoChannel.send({type:'broadcast',event:'video',payload:p})}catch(e){}});\n          videoChannelReadyWaiters.splice(0).forEach(r=>r());\n        } else console.warn('영상통화 채널 연결 상태:',status);\n      });\n  }catch(e){ console.warn('영상통화 초기화 실패:',e); }\n}`;
-          if oldInit not in html: raise SystemExit('old init not found')
-          html=html.replace(oldInit,newInit)
-          oldSend="""function sendVideoSignal(payload){\n  if(!videoChannel) return;\n  videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>console.warn('영상통화 신호 전송 실패:',e));\n}"""
-          newSend="""function sendVideoSignal(payload){\n  if(!videoChannel || !videoChannelReady){\n    videoSignalQueue.push(payload);\n    initVideoCalling().catch(()=>{});\n    return;\n  }\n  videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>{console.warn('영상통화 신호 전송 실패:',e);videoSignalQueue.push(payload);});\n}"""
-          if oldSend not in html: raise SystemExit('old send not found')
-          html=html.replace(oldSend,newSend)
-          # Ensure invite waits for channel, but do not block push/media path.
-          html=html.replace("    await getVideoMedia();\n    createVideoPeer();\n    openVideoCallUI(name,'상대방의 응답을 기다리는 중…');\n    sendVideoSignal({type:'invite',from:currentUser,to:name});","    await getVideoMedia();\n    createVideoPeer();\n    openVideoCallUI(name,'상대방의 응답을 기다리는 중…');\n    await initVideoCalling();\n    sendVideoSignal({type:'invite',from:currentUser,to:name});",1)
-          html=html.replace("    await getVideoMedia();\n    createVideoPeer();\n    openVideoCallUI(name,'연결 중…');\n    sendVideoSignal({type:'accept',from:currentUser,to:name});","    await getVideoMedia();\n    createVideoPeer();\n    openVideoCallUI(name,'연결 중…');\n    await initVideoCalling();\n    sendVideoSignal({type:'accept',from:currentUser,to:name});",1)
-          # Incoming FCM path must initialize state before showing overlay.
-          html=html.replace("function showIncomingVideoCall(name){\n  const idx=family.indexOf(name);","function showIncomingVideoCall(name){\n  if(!videoIncomingFrom) videoIncomingFrom=name;\n  if(!videoTargetUser) videoTargetUser=name;\n  const idx=family.indexOf(name);",1)
+
+          // Video: Realtime channel must be SUBSCRIBED before invite/accept/offer/ICE signals are sent.
+          html=html.replace('let videoChannel = null;',`let videoChannel = null;
+          let videoChannelReady = false;
+          let videoSignalQueue = [];
+          `);
+
+          const oldInit = String.raw`async function initVideoCalling(){
+            try{
+              if(!sb || videoChannel) return;
+              videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });
+              videoChannel
+                .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))
+                .subscribe((status)=>{
+                  if(status!=='SUBSCRIBED') console.warn('영상통화 채널 연결 상태:',status);
+                });
+            }catch(e){ console.warn('영상통화 초기화 실패:',e); }
+          }`;
+
+          const newInit = String.raw`async function initVideoCalling(){
+            try{
+              if(!sb) return;
+              if(videoChannel && videoChannelReady) return;
+              if(videoChannel && !videoChannelReady) return;
+              videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });
+              videoChannelReady=false;
+              videoChannel
+                .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))
+                .subscribe((status)=>{
+                  videoChannelReady=(status==='SUBSCRIBED');
+                  if(videoChannelReady){
+                    const q=videoSignalQueue.splice(0);
+                    q.forEach(p=>{
+                      videoChannel.send({type:'broadcast',event:'video',payload:p}).catch(e=>console.warn('queued video signal failed:',e));
+                    });
+                  }else{
+                    console.warn('영상통화 채널 연결 상태:',status);
+                  }
+                });
+            }catch(e){ console.warn('영상통화 초기화 실패:',e); }
+          }`;
+          if(!html.includes(oldInit)) throw new Error('old init not found');
+          html=html.replace(oldInit,newInit);
+
+          const oldSend = String.raw`function sendVideoSignal(payload){
+            if(!videoChannel) return;
+            videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>console.warn('영상통화 신호 전송 실패:',e));
+          }`;
+          const newSend = String.raw`function sendVideoSignal(payload){
+            if(!videoChannel || !videoChannelReady){
+              videoSignalQueue.push(payload);
+              initVideoCalling().catch(()=>{});
+              return;
+            }
+            videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>{
+              console.warn('영상통화 신호 전송 실패:',e);
+              videoSignalQueue.push(payload);
+            });
+          }`;
+          if(!html.includes(oldSend)) throw new Error('old send not found');
+          html=html.replace(oldSend,newSend);
+
+          html=html.replace(`    await getVideoMedia();
+            createVideoPeer();
+            openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
+            sendVideoSignal({type:'invite',from:currentUser,to:name});`,`    await getVideoMedia();
+            createVideoPeer();
+            openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
+            await initVideoCalling();
+            sendVideoSignal({type:'invite',from:currentUser,to:name});`);
+          html=html.replace(`    await getVideoMedia();
+            createVideoPeer();
+            openVideoCallUI(name,'연결 중…');
+            sendVideoSignal({type:'accept',from:currentUser,to:name});`,`    await getVideoMedia();
+            createVideoPeer();
+            openVideoCallUI(name,'연결 중…');
+            await initVideoCalling();
+            sendVideoSignal({type:'accept',from:currentUser,to:name});`);
+
+          html=html.replace(`function showIncomingVideoCall(name){
+            const idx=family.indexOf(name);`,`function showIncomingVideoCall(name){
+            if(!videoIncomingFrom) videoIncomingFrom=name;
+            if(!videoTargetUser) videoTargetUser=name;
+            const idx=family.indexOf(name);`);
+
+          html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');
           fs.writeFileSync(path.join(out,'index.html'),html);
           EOF2
           cat > scripts/patch-android.mjs <<'EOF2'
@@ -88,7 +167,10 @@ jobs:
           cat > scripts/bundle-native.mjs <<'EOF2'
           import {build} from 'esbuild';await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
           EOF2
-          npm install && npm run build && npx cap add android && npx cap sync android
+          npm install
+          npm run build
+          npx cap add android
+          npx cap sync android
           node scripts/patch-android.mjs
           python3 - <<'PY'
           from pathlib import Path
