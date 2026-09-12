@@ -85,11 +85,11 @@ jobs:
           cat > scripts/patch-android.mjs <<'EOF2'
           import fs from 'node:fs';const m='android/app/src/main/AndroidManifest.xml';let s=fs.readFileSync(m,'utf8');const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];for(const p of perms){const line=`<uses-permission android:name="android.permission.${p}" />`;if(!s.includes(`android.permission.${p}`))s=s.replace('<application',line+'\n    <application');}if(!s.includes('NativeLocationService'))s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n  </application>');fs.writeFileSync(m,s);
           EOF2
-          node scripts/patch-android.mjs
           cat > scripts/bundle-native.mjs <<'EOF2'
           import {build} from 'esbuild';await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
           EOF2
           npm install && npm run build && npx cap add android && npx cap sync android
+          node scripts/patch-android.mjs
           python3 - <<'PY'
           from pathlib import Path
           root=Path('android/build.gradle');s=root.read_text()
