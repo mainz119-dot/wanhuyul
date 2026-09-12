@@ -1,4 +1,4 @@
-name: Build 우리집 Android APK v19 - Push Auth + Video Call Fix
+name: Build 우리집 Android APK v19 - Push Auth + Video Call Fix 2
 
 on:
   workflow_dispatch:
@@ -74,25 +74,13 @@ jobs:
           let html=fs.readFileSync(path.join(out,'index.html'),'utf8');
           html=html.replace(/<\/body>/i,'<style>/* v19 chat overlap fix */ .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:78px!important} #dmMessages.chat.chat-scrollable{height:calc(52dvh - 10px)!important;min-height:300px!important;max-height:520px!important}</style></body>');
 
-          // Video: Realtime channel must be SUBSCRIBED before invite/accept/offer/ICE signals are sent.
-          html=html.replace('let videoChannel = null;',`let videoChannel = null;
+          // v19 video fix: patch the existing video functions without depending on exact whitespace.
+          html=html.replace(/let videoChannel = null;/, `let videoChannel = null;
           let videoChannelReady = false;
           let videoSignalQueue = [];
           `);
 
-          const oldInit = String.raw`async function initVideoCalling(){
-            try{
-              if(!sb || videoChannel) return;
-              videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });
-              videoChannel
-                .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))
-                .subscribe((status)=>{
-                  if(status!=='SUBSCRIBED') console.warn('영상통화 채널 연결 상태:',status);
-                });
-            }catch(e){ console.warn('영상통화 초기화 실패:',e); }
-          }`;
-
-          const newInit = String.raw`async function initVideoCalling(){
+          html=html.replace(/async function initVideoCalling\(\)\{[\s\S]*?\n\}/, `async function initVideoCalling(){
             try{
               if(!sb) return;
               if(videoChannel && videoChannelReady) return;
@@ -108,20 +96,12 @@ jobs:
                     q.forEach(p=>{
                       videoChannel.send({type:'broadcast',event:'video',payload:p}).catch(e=>console.warn('queued video signal failed:',e));
                     });
-                  }else{
-                    console.warn('영상통화 채널 연결 상태:',status);
-                  }
+                  }else console.warn('영상통화 채널 연결 상태:',status);
                 });
             }catch(e){ console.warn('영상통화 초기화 실패:',e); }
-          }`;
-          if(!html.includes(oldInit)) throw new Error('old init not found');
-          html=html.replace(oldInit,newInit);
+          }`);
 
-          const oldSend = String.raw`function sendVideoSignal(payload){
-            if(!videoChannel) return;
-            videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>console.warn('영상통화 신호 전송 실패:',e));
-          }`;
-          const newSend = String.raw`function sendVideoSignal(payload){
+          html=html.replace(/function sendVideoSignal\(payload\)\{[\s\S]*?\n\}/, `function sendVideoSignal(payload){
             if(!videoChannel || !videoChannelReady){
               videoSignalQueue.push(payload);
               initVideoCalling().catch(()=>{});
@@ -131,33 +111,18 @@ jobs:
               console.warn('영상통화 신호 전송 실패:',e);
               videoSignalQueue.push(payload);
             });
-          }`;
-          if(!html.includes(oldSend)) throw new Error('old send not found');
-          html=html.replace(oldSend,newSend);
+          }`);
 
-          html=html.replace(`    await getVideoMedia();
-            createVideoPeer();
-            openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
-            sendVideoSignal({type:'invite',from:currentUser,to:name});`,`    await getVideoMedia();
-            createVideoPeer();
-            openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
-            await initVideoCalling();
-            sendVideoSignal({type:'invite',from:currentUser,to:name});`);
-          html=html.replace(`    await getVideoMedia();
-            createVideoPeer();
-            openVideoCallUI(name,'연결 중…');
-            sendVideoSignal({type:'accept',from:currentUser,to:name});`,`    await getVideoMedia();
-            createVideoPeer();
-            openVideoCallUI(name,'연결 중…');
-            await initVideoCalling();
-            sendVideoSignal({type:'accept',from:currentUser,to:name});`);
+          html=html.replace(/(async function startVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'상대방의 응답을 기다리는 중…'\);\s*)sendVideoSignal\(\{type:'invite'/,
+            `$1await initVideoCalling();
+    sendVideoSignal({type:'invite'`);
+          html=html.replace(/(async function acceptVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'연결 중…'\);\s*)sendVideoSignal\(\{type:'accept'/,
+            `$1await initVideoCalling();
+    sendVideoSignal({type:'accept'`);
 
-          html=html.replace(`function showIncomingVideoCall(name){
-            const idx=family.indexOf(name);`,`function showIncomingVideoCall(name){
+          html=html.replace(/function showIncomingVideoCall\(name\)\{/, `function showIncomingVideoCall(name){
             if(!videoIncomingFrom) videoIncomingFrom=name;
-            if(!videoTargetUser) videoTargetUser=name;
-            const idx=family.indexOf(name);`);
-
+            if(!videoTargetUser) videoTargetUser=name;`);
           html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');
           fs.writeFileSync(path.join(out,'index.html'),html);
           EOF2
@@ -168,6 +133,8 @@ jobs:
           import {build} from 'esbuild';await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
           EOF2
           npm install
+          node --check scripts/prepare-web.mjs
+          node --check scripts/bundle-native.mjs
           npm run build
           npx cap add android
           npx cap sync android
