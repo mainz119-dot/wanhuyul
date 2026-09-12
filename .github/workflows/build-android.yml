@@ -1,4 +1,4 @@
-name: Build 우리집 Android APK v19 - Push Auth + Video Call Fix 2
+name: Build 우리집 Android APK v20 - buildfix6
 
 on:
   workflow_dispatch:
@@ -355,6 +355,11 @@ jobs:
           npm run build
           npx cap add android
           npx cap sync android
+          cat > scripts/patch-android.mjs <<'EOF2'
+          import fs from 'node:fs';const m='android/app/src/main/AndroidManifest.xml';let s=fs.readFileSync(m,'utf8');const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];for(const p of perms){const line=`<uses-permission android:name="android.permission.${p}" />`;if(!s.includes(`android.permission.${p}`))s=s.replace('<application',line+'\n    <application');}if(!s.includes('NativeLocationService'))s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n  </application>');fs.writeFileSync(m,s);
+          EOF2
+          test -f scripts/patch-android.mjs
+          node --check scripts/patch-android.mjs
           node scripts/patch-android.mjs
           python3 - <<'PY'
           from pathlib import Path
@@ -420,9 +425,6 @@ jobs:
             @Override public void onDestroy(){try{if(client!=null&&callback!=null)client.removeLocationUpdates(callback);}catch(Exception ignored){}super.onDestroy();}@Override public IBinder onBind(Intent i){return null;}
           }
           EOF2
-          cat > scripts/patch-android.mjs <<'EOF2'
-          import fs from 'node:fs';const m='android/app/src/main/AndroidManifest.xml';let s=fs.readFileSync(m,'utf8');const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];for(const p of perms){const line=`<uses-permission android:name="android.permission.${p}" />`;if(!s.includes(`android.permission.${p}`))s=s.replace('<application',line+'\n    <application');}if(!s.includes('NativeLocationService'))s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n  </application>');fs.writeFileSync(m,s);
-          EOF2
           node scripts/patch-android.mjs
       - name: Build debug APK
         shell: bash
@@ -433,6 +435,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: wanhuyul-apk-v19
+          name: wanhuyul-apk-v20-buildfix6
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
