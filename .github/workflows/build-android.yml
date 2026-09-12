@@ -263,7 +263,7 @@ jobs:
 
             /* 기존 sendDm은 DB 저장 후 Broadcast도 전송 */
             function wrapDm(){
-              if(typeof window.sendDm!=='function'||window.sendDm.__v20)return;
+              if(typeof window.sendDm!=='function'||window.sendDm.__v22Push)return;
               const original=window.sendDm;
               window.sendDm=async function(){
                 const box=document.getElementById('dmInputBox');
@@ -278,7 +278,36 @@ jobs:
                 }
                 return r;
               };
-              window.sendDm.__v21=true;
+              window.sendDm.__v22Push=true;
+            }
+
+            /* v22-push-fix: 가족톡(그룹) / 사진 전송도 push 트리거 연결 (기존엔 누락되어 있었음) */
+            function wrapGroupAndPhoto(){
+              if(typeof window.sendGroup==='function'&&!window.sendGroup.__v22Push){
+                const originalGroup=window.sendGroup;
+                window.sendGroup=async function(){
+                  const box=document.getElementById('groupInputBox');
+                  const text=box?.value?.trim()||'';
+                  const before=typeof groupChat!=='undefined'?groupChat.length:0;
+                  const r=await originalGroup.apply(this,arguments);
+                  if(text&&typeof groupChat!=='undefined'&&groupChat.length>before)push({sender_name:me(),content:text},'group');
+                  return r;
+                };
+                window.sendGroup.__v22Push=true;
+              }
+              if(typeof window.uploadChatPhoto==='function'&&!window.uploadChatPhoto.__v22Push){
+                const originalPhoto=window.uploadChatPhoto;
+                window.uploadChatPhoto=async function(file,type){
+                  const target=type==='dm'&&(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                  const r=await originalPhoto.apply(this,arguments);
+                  if(file&&me()){
+                    const rec=type==='dm'?{sender_name:me(),receiver_name:target,content:'📷 사진을 보냈습니다.'}:{sender_name:me(),content:'📷 사진을 보냈습니다.'};
+                    push(rec,type==='dm'?'dm':'group');
+                  }
+                  return r;
+                };
+                window.uploadChatPhoto.__v22Push=true;
+              }
             }
 
             /* ---------- 영상통화: 동일한 전역 lexical 변수에 직접 연결 ---------- */
@@ -341,6 +370,7 @@ jobs:
               await syncToken();
               await initDmBroadcast();
               wrapDm();
+              wrapGroupAndPhoto();
               await ensureVideoChannel();
               await pollDm();
             }
@@ -348,6 +378,7 @@ jobs:
             setInterval(()=>{
               syncToken();
               wrapDm();
+              wrapGroupAndPhoto();
               if(document.getElementById('dm')?.classList.contains('active')){ initDmBroadcast(); pollDm(); }
               ensureVideoChannel();
             },1000);
@@ -402,12 +433,10 @@ jobs:
               @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback cb){if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)cb.invoke(origin,true,false);else{pendingGeoOrigin=origin;pendingGeoCallback=cb;ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},PERM+2);}}
               @Override public void onPermissionRequest(PermissionRequest r){runOnUiThread(()->handleWebPermission(r));}
             });w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");
-              // v22-systembar-fix: 일부 Android 15/16 기기에서 Capacitor WebView가 상태표시줄 아래로 깔리는 문제를 직접 보정
-              try{
-                final int sid=getResources().getIdentifier("status_bar_height","dimen","android");
-                final int top=sid>0?getResources().getDimensionPixelSize(sid):0;
-                if(top>0) w.setPadding(w.getPaddingLeft(),top,w.getPaddingRight(),w.getPaddingBottom());
-              }catch(Exception ignored){}
+              // v23: 상태표시줄/네비게이션바 인셋은 capacitor.config.ts의 adjustMarginsForEdgeToEdge:'force' 가
+              // 전담해서 처리한다. 예전에 여기서 WebView에 수동으로 setPadding(top=status_bar_height)을 추가로
+              // 걸었는데, 이게 Capacitor의 자체 인셋 보정과 타이밍에 따라 이중으로 겹치거나 서로 무효화시키면서
+              // 기기별로 상태바/하단 네비 겹침이 들쭉날쭉하게 재발하는 원인이었다. 보정 방식을 하나로 통일한다.
             }
               locationReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){if(!"com.woorijip.family.LOCATION_UPDATE".equals(i.getAction()))return;double lat=i.getDoubleExtra("latitude",0),lng=i.getDoubleExtra("longitude",0);float acc=i.getFloatExtra("accuracy",0);try{WebView v=getBridge().getWebView();if(v!=null){String js=String.format(java.util.Locale.US,"try{if(window.handleNativeLocation)window.handleNativeLocation(%f,%f,%f);window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}",lat,lng,acc,lat,lng,acc);v.post(()->v.evaluateJavascript(js,null));}}catch(Exception e){}}};
               try{if(Build.VERSION.SDK_INT>=33)registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"),Context.RECEIVER_NOT_EXPORTED);else registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"));}catch(Exception e){}
@@ -457,7 +486,8 @@ jobs:
           EOF2
           node scripts/patch-android.mjs
           grep -q 'woorijip-v20-fixes-js' www/index.html
-          grep -q 'window.sendDm.__v21' www/index.html
+          grep -q 'window.sendDm.__v22Push' www/index.html
+          grep -q 'window.sendGroup.__v22Push' www/index.html
           grep -q 'v22-systembar-fix' www/index.html
           grep -q 'v22-push-fix' android/app/src/main/java/com/woorijip/family/MyFirebaseService.java
       - name: Build debug APK
