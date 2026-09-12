@@ -38,25 +38,112 @@ jobs:
           mkdir -p scripts native
           cat > native/native-bridge.js <<'EOF2'
           (()=>{
-            let tokenSynced=false;
+            let tokenLast='';
             const native=()=>window.WoorijipNative&&typeof window.WoorijipNative.startNativeLocation==='function';
-            const me=()=>{try{return(typeof currentUser!=='undefined'&&currentUser)||localStorage.getItem('woorijipCurrentUser')||localStorage.getItem('woorijipMyName')||''}catch(e){return''}};
+            const me=()=>{try{return(typeof currentUser!=='undefined'&&currentUser)||localStorage.getItem('woorijipMyName')||''}catch(e){return''}};
             const locOn=()=>{try{return localStorage.getItem('woorijipLocationSharing')==='1'||localStorage.getItem('woorijipLocationSharingEnabled')==='1'}catch(e){return false}};
-            const ensureAuth=async()=>{try{if(typeof sb==='undefined'||!sb.auth)return false;const {data}=await sb.auth.getSession();if(data?.session)return true;const r=await sb.auth.signInAnonymously();if(r.error){console.warn('anonymous auth failed:',r.error.message);return false;}return !!r.data?.session;}catch(e){console.warn('anonymous auth error',e);return false}};
-            const push=async(record,type)=>{try{if(typeof sb==='undefined')return;const ok=await ensureAuth();if(!ok)return;const {data,error}=await sb.functions.invoke('send-push',{body:{record,type}});if(error)console.warn('send-push error:',error.message||error);else console.log('send-push result:',data);}catch(e){console.warn('push call failed',e)}};
-            const syncToken=async()=>{try{if(tokenSynced||typeof sb==='undefined'||!window.WoorijipNative?.getFcmToken)return;const u=me(),t=window.WoorijipNative.getFcmToken();if(!u||!t)return;const ok=await ensureAuth();if(!ok)return;const {error}=await sb.from('family_fcm_tokens').upsert({user_name:u,token:t,updated_at:new Date().toISOString()},{onConflict:'user_name'});if(error)console.warn('FCM token sync failed',error.message);else tokenSynced=true}catch(e){console.warn('FCM token sync',e)}};
-            const confirmAndPush=async(type,record,text,started)=>{try{if(typeof sb==='undefined')return;const ok=await ensureAuth();if(!ok)return;const table=type==='dm'?'direct_messages':'family_messages';let q=sb.from(table).select('id,created_at').eq('sender_name',record.sender_name).eq('content',text).gte('created_at',new Date(started-15000).toISOString()).order('created_at',{ascending:false}).limit(1);if(type==='dm')q=q.eq('receiver_name',record.receiver_name);const {data,error}=await q;if(error||!data?.length){console.warn('push confirm: message not found',error?.message);return;}await push(record,type==='dm'?'dm':'group')}catch(e){console.warn('push confirm failed',e)}};
-            const wrap=()=>{
-              if(typeof window.sendDm==='function'&&!window.sendDm.__nativeWrapped){const dm=window.sendDm;window.sendDm=async function(...a){const started=Date.now();let text='',to='';try{text=(document.getElementById('dmInputBox')?.value||'').trim();to=(typeof family!=='undefined'&&activePersonIndex!==null?family[activePersonIndex]:'')}catch(e){}const r=await dm.apply(this,a);if(text&&to&&me())await confirmAndPush('dm',{sender_name:me(),receiver_name:to,content:text},text,started);return r};window.sendDm.__nativeWrapped=true;}
-              if(typeof window.sendGroup==='function'&&!window.sendGroup.__nativeWrapped){const group=window.sendGroup;window.sendGroup=async function(...a){const started=Date.now();let text='';try{text=(document.getElementById('groupInputBox')?.value||'').trim()}catch(e){}const r=await group.apply(this,a);if(text&&me())await confirmAndPush('group',{sender_name:me(),content:text},text,started);return r};window.sendGroup.__nativeWrapped=true;}
-              if(typeof window.uploadChatPhoto==='function'&&!window.uploadChatPhoto.__nativeWrapped){const up=window.uploadChatPhoto;window.uploadChatPhoto=async function(file,type){const to=type==='dm'?(typeof family!=='undefined'&&activePersonIndex!==null?family[activePersonIndex]:''):'';const r=await up.apply(this,arguments);try{if(file&&me()){const text='📷 사진을 보냈습니다.';if(type==='dm')await push({sender_name:me(),receiver_name:to,content:text},'dm');else await push({sender_name:me(),content:text},'group')}}catch(e){}return r};window.uploadChatPhoto.__nativeWrapped=true;}
-              if(typeof window.startVideoCall==='function'&&!window.startVideoCall.__nativeWrapped){const vc=window.startVideoCall;window.startVideoCall=async function(...a){let to='';try{to=typeof family!=='undefined'&&activePersonIndex!==null?family[activePersonIndex]:''}catch(e){}const from=me();if(to&&from)push({sender_name:from,receiver_name:to,content:'영상통화'},'video');return vc.apply(this,a)};window.startVideoCall.__nativeWrapped=true;}
-            };
-            window.addEventListener('WoorijipLocationUpdate',e=>{const d=e.detail||{};window.dispatchEvent(new CustomEvent('native-location-update',{detail:d}));try{if(typeof window.handleNativeLocation==='function')window.handleNativeLocation(d.latitude,d.longitude,d.accuracy||0)}catch(err){}});
-            function keep(){if(!native())return;const u=me();if(!u)return;try{WoorijipNative.setLocationUser(u);if(locOn())WoorijipNative.startNativeLocation();else WoorijipNative.stopNativeLocation()}catch(e){console.warn('native GPS bridge',e)}}
-            function pendingPush(){try{const raw=window.WoorijipNative?.getPendingPush?.();if(!raw)return;const d=JSON.parse(raw);if(window.WoorijipNative?.clearPendingPush)window.WoorijipNative.clearPendingPush();const go=()=>{if(d.type==='video'&&d.from&&typeof window.showIncomingVideoCall==='function'){if(typeof videoIncomingFrom!=='undefined')videoIncomingFrom=d.from;if(typeof videoTargetUser!=='undefined')videoTargetUser=d.from;if(typeof videoCallRole!=='undefined')videoCallRole='callee';window.showIncomingVideoCall(d.from);return true}if((d.type==='chat'||d.type==='dm'||d.type==='group')&&typeof window.goToPage==='function'){window.goToPage('chat');return true}return false};if(!go())setTimeout(()=>{if(!go())setTimeout(go,1500)},800)}catch(e){}}
-            async function boot(){keep();wrap();await ensureAuth();syncToken();pendingPush();}
-            setTimeout(boot,1500);setInterval(()=>{keep();wrap();syncToken();pendingPush();},4000);
+            async function ensureAuth(){
+              try{
+                if(typeof sb==='undefined'||!sb.auth)return false;
+                const s=await sb.auth.getSession();
+                if(s.data?.session)return true;
+                const r=await sb.auth.signInAnonymously();
+                if(r.error){console.warn('[v20] anonymous auth:',r.error.message);return false;}
+                return !!r.data?.session;
+              }catch(e){console.warn('[v20] auth:',e);return false}
+            }
+            async function push(record,type){
+              try{
+                if(typeof sb==='undefined')return;
+                if(!(await ensureAuth()))return;
+                const r=await sb.functions.invoke('send-push',{body:{record,type}});
+                if(r.error)console.warn('[v20] send-push:',r.error.message||r.error);
+                else console.log('[v20] push result:',type,r.data);
+              }catch(e){console.warn('[v20] push exception:',e)}
+            }
+            async function syncToken(){
+              try{
+                const user=me(), token=window.WoorijipNative?.getFcmToken?.()||'';
+                if(!user||!token||typeof sb==='undefined')return;
+                if(token===tokenLast)return;
+                if(!(await ensureAuth()))return;
+                const {error}=await sb.from('family_fcm_tokens').upsert({user_name:user,token,updated_at:new Date().toISOString()},{onConflict:'user_name'});
+                if(error)console.warn('[v20] FCM token sync:',error.message);
+                else{tokenLast=token;console.log('[v20] FCM token synced:',user)}
+              }catch(e){console.warn('[v20] token sync exception:',e)}
+            }
+            function wrap(){
+              if(typeof window.sendDm==='function'&&!window.sendDm.__v20Push){
+                const original=window.sendDm;
+                window.sendDm=async function(){
+                  const box=document.getElementById('dmInputBox');
+                  const text=box?.value?.trim()||'';
+                  const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                  const before=typeof dmMessagesList!=='undefined'?dmMessagesList.length:0;
+                  const r=await original.apply(this,arguments);
+                  if(text&&target&&typeof dmMessagesList!=='undefined'&&dmMessagesList.length>before)push({sender_name:me(),receiver_name:target,content:text},'dm');
+                  return r;
+                };
+                window.sendDm.__v20Push=true;
+              }
+              if(typeof window.sendGroup==='function'&&!window.sendGroup.__v20Push){
+                const original=window.sendGroup;
+                window.sendGroup=async function(){
+                  const box=document.getElementById('groupInputBox');
+                  const text=box?.value?.trim()||'';
+                  const before=typeof groupChat!=='undefined'?groupChat.length:0;
+                  const r=await original.apply(this,arguments);
+                  if(text&&typeof groupChat!=='undefined'&&groupChat.length>before)push({sender_name:me(),content:text},'group');
+                  return r;
+                };
+                window.sendGroup.__v20Push=true;
+              }
+              if(typeof window.uploadChatPhoto==='function'&&!window.uploadChatPhoto.__v20Push){
+                const original=window.uploadChatPhoto;
+                window.uploadChatPhoto=async function(file,type){
+                  const target=type==='dm'&&(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                  const r=await original.apply(this,arguments);
+                  if(file&&me()){const rec=type==='dm'?{sender_name:me(),receiver_name:target,content:'📷 사진을 보냈습니다.'}:{sender_name:me(),content:'📷 사진을 보냈습니다.'};push(rec,type==='dm'?'dm':'group');}
+                  return r;
+                };
+                window.uploadChatPhoto.__v20Push=true;
+              }
+              if(typeof window.startVideoCall==='function'&&!window.startVideoCall.__v20Push){
+                const original=window.startVideoCall;
+                window.startVideoCall=async function(){
+                  const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                  const from=me();
+                  if(target&&from)push({sender_name:from,receiver_name:target,content:'영상통화'},'video');
+                  return original.apply(this,arguments);
+                };
+                window.startVideoCall.__v20Push=true;
+              }
+            }
+            function keep(){
+              if(!native())return;
+              const u=me();if(!u)return;
+              try{WoorijipNative.setLocationUser(u);if(locOn())WoorijipNative.startNativeLocation();else WoorijipNative.stopNativeLocation()}catch(e){console.warn('[v20] GPS bridge',e)}
+            }
+            function pendingPush(){
+              try{
+                const raw=window.WoorijipNative?.getPendingPush?.();if(!raw)return;
+                const d=JSON.parse(raw);window.WoorijipNative?.clearPendingPush?.();
+                const go=()=>{
+                  if(d.type==='video'&&d.from&&typeof window.showIncomingVideoCall==='function'){
+                    if(typeof videoIncomingFrom!=='undefined')videoIncomingFrom=d.from;
+                    if(typeof videoTargetUser!=='undefined')videoTargetUser=d.from;
+                    if(typeof videoCallRole!=='undefined')videoCallRole='callee';
+                    window.showIncomingVideoCall(d.from);return true;
+                  }
+                  if((d.type==='dm'||d.type==='group'||d.type==='chat')&&typeof window.goToPage==='function'){window.goToPage('chat');return true}
+                  return false;
+                };
+                if(!go())setTimeout(()=>{if(!go())setTimeout(go,1500)},800);
+              }catch(e){console.warn('[v20] pending push',e)}
+            }
+            async function boot(){await ensureAuth();syncToken();wrap();keep();pendingPush();}
+            setTimeout(boot,1800);
+            setInterval(()=>{syncToken();wrap();keep();pendingPush();},2000);
           })();
           EOF2
           cat > scripts/prepare-web.mjs <<'EOF2'
@@ -71,63 +158,193 @@ jobs:
             if(excluded.has(name)) continue;
             fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true});
           }
-          let html=fs.readFileSync(path.join(out,'index.html'),'utf8');
-          html=html.replace(/<\/body>/i,'<style>/* v19 chat overlap fix */ .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:78px!important} #dmMessages.chat.chat-scrollable{height:calc(52dvh - 10px)!important;min-height:300px!important;max-height:520px!important}</style></body>');
-
-          // v19 video fix: patch the existing video functions without depending on exact whitespace.
-          html=html.replace(/let videoChannel = null;/, `let videoChannel = null;
-          let videoChannelReady = false;
-          let videoSignalQueue = [];
-          `);
-
-          html=html.replace(/async function initVideoCalling\(\)\{[\s\S]*?\n\}/, `async function initVideoCalling(){
-            try{
-              if(!sb) return;
-              if(videoChannel && videoChannelReady) return;
-              if(videoChannel && !videoChannelReady) return;
-              videoChannel = sb.channel(videoChannelName(), { config:{ broadcast:{ self:false } } });
-              videoChannelReady=false;
-              videoChannel
-                .on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload))
-                .subscribe((status)=>{
-                  videoChannelReady=(status==='SUBSCRIBED');
-                  if(videoChannelReady){
-                    const q=videoSignalQueue.splice(0);
-                    q.forEach(p=>{
-                      videoChannel.send({type:'broadcast',event:'video',payload:p}).catch(e=>console.warn('queued video signal failed:',e));
-                    });
-                  }else console.warn('영상통화 채널 연결 상태:',status);
-                });
-            }catch(e){ console.warn('영상통화 초기화 실패:',e); }
-          }`);
-
-          html=html.replace(/function sendVideoSignal\(payload\)\{[\s\S]*?\n\}/, `function sendVideoSignal(payload){
-            if(!videoChannel || !videoChannelReady){
-              videoSignalQueue.push(payload);
-              initVideoCalling().catch(()=>{});
-              return;
+          const htmlPath=path.join(out,'index.html');
+          let html=fs.readFileSync(htmlPath,'utf8');
+          const css=`
+          <style id="woorijip-v20-fixes">
+          /* v20: 채팅 입력창/하단 네비 겹침 방지 */
+          .chat.chat-scrollable{height:calc(52dvh - 20px)!important;max-height:500px!important;padding-bottom:88px!important}
+          #dmMessages.chat.chat-scrollable{height:calc(52dvh - 20px)!important;min-height:300px!important;max-height:520px!important}
+          /* v20: 뭐할까 페이지가 하단 네비에 가려지지 않도록 충분한 하단 여백 */
+          #schedule{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;min-height:calc(100dvh - 100px);box-sizing:border-box}
+          #schedule .card:last-child{margin-bottom:40px}
+          </style>`;
+          const js=`
+          <script id="woorijip-v20-fixes-js">
+          (function(){
+            const log=(...a)=>console.log('[v20]',...a);
+            const me=()=>{try{return(typeof currentUser!=='undefined'&&currentUser)||localStorage.getItem('woorijipMyName')||''}catch(e){return''}};
+            async function ensureAuth(){
+              try{
+                if(typeof sb==='undefined'||!sb.auth)return false;
+                const s=await sb.auth.getSession();
+                if(s.data?.session)return true;
+                const r=await sb.auth.signInAnonymously();
+                if(r.error){console.warn('[v20] anonymous auth:',r.error.message);return false;}
+                return !!r.data?.session;
+              }catch(e){console.warn('[v20] auth:',e);return false;}
             }
-            videoChannel.send({type:'broadcast',event:'video',payload}).catch(e=>{
-              console.warn('영상통화 신호 전송 실패:',e);
-              videoSignalQueue.push(payload);
-            });
-          }`);
+            async function push(record,type){
+              try{
+                if(!(await ensureAuth()))return;
+                const r=await sb.functions.invoke('send-push',{body:{record,type}});
+                if(r.error)console.warn('[v20] send-push:',r.error.message||r.error);
+                else log('push',type,r.data);
+              }catch(e){console.warn('[v20] push exception:',e)}
+            }
+            async function syncToken(){
+              try{
+                const token=window.WoorijipNative?.getFcmToken?.();
+                const user=me();
+                if(!token||!user||typeof sb==='undefined')return;
+                if(!(await ensureAuth()))return;
+                const {error}=await sb.from('family_fcm_tokens').upsert({user_name:user,token,updated_at:new Date().toISOString()},{onConflict:'user_name'});
+                if(error)console.warn('[v20] token sync:',error.message); else log('FCM token synced',user);
+              }catch(e){console.warn('[v20] token sync exception:',e)}
+            }
 
-          html=html.replace(/(async function startVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'상대방의 응답을 기다리는 중…'\);\s*)sendVideoSignal\(\{type:'invite'/,
-            `$1await initVideoCalling();
-          sendVideoSignal({type:'invite'`);
-          html=html.replace(/(async function acceptVideoCall\(\)[\s\S]*?openVideoCallUI\(name,'연결 중…'\);\s*)sendVideoSignal\(\{type:'accept'/,
-            `$1await initVideoCalling();
-          sendVideoSignal({type:'accept'`);
+            /* ---------- 1:1 실시간: Broadcast + 1.5초 폴백 ---------- */
+            let dmChannel=null, dmReady=false, dmLastSeen={};
+            function dmKey(){
+              const u=me();
+              const t=(typeof family!=='undefined'&&typeof activePersonIndex!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+              return [u,t].sort().join('|');
+            }
+            async function initDmBroadcast(){
+              if(typeof sb==='undefined')return;
+              try{
+                if(dmChannel){
+                  if(dmChannel.state==='joined')return;
+                  try{await dmChannel.unsubscribe()}catch(e){}
+                  dmChannel=null;
+                }
+                const key=dmKey();
+                if(!key || key==='|')return;
+                dmChannel=sb.channel('woorijip-dm-v20',{config:{broadcast:{self:false}}});
+                dmReady=false;
+                dmChannel.on('broadcast',{event:'dm'},({payload})=>{
+                  const m=payload?.message;
+                  if(!m || m.receiver_name!==me() || m.sender_name===me())return;
+                  const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:null;
+                  if(target!==m.sender_name)return;
+                  if(!dmMessagesList.some(x=>String(x.id)===String(m.id))){
+                    dmMessagesList.push(m);
+                    renderDm();
+                    sb.from('direct_messages').update({is_read:true}).eq('id',m.id).then(()=>{});
+                  }
+                }).subscribe(status=>{dmReady=status==='SUBSCRIBED';log('DM channel',status)});
+              }catch(e){console.warn('[v20] DM channel:',e)}
+            }
+            async function broadcastDm(row){
+              try{
+                if(!dmChannel || !dmReady)await initDmBroadcast();
+                if(dmChannel&&dmReady)await dmChannel.send({type:'broadcast',event:'dm',payload:{message:row}});
+              }catch(e){console.warn('[v20] DM broadcast:',e)}
+            }
+            async function pollDm(){
+              try{
+                if(typeof sb==='undefined'||typeof dmMessagesList==='undefined'||typeof activePersonIndex==='undefined'||activePersonIndex===null)return;
+                const target=family[activePersonIndex];
+                if(!target||!document.getElementById('dm')?.classList.contains('active'))return;
+                const filter='and(sender_name.eq.'+me()+',receiver_name.eq.'+target+'),and(sender_name.eq.'+target+',receiver_name.eq.'+me()+')';
+                const {data,error}=await sb.from('direct_messages').select('*').or(filter).order('created_at',{ascending:false}).limit(100);
+                if(error||!data)return;
+                const rows=data.slice().reverse();
+                const ids=new Set(dmMessagesList.map(m=>String(m.id)));
+                let changed=false;
+                for(const row of rows){if(!ids.has(String(row.id))){dmMessagesList.push(row);changed=true;}}
+                if(changed){dmMessagesList.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));renderDm();}
+              }catch(e){console.warn('[v20] DM poll:',e)}
+            }
 
-          html=html.replace(/function showIncomingVideoCall\(name\)\{/, `function showIncomingVideoCall(name){
-            if(!videoIncomingFrom) videoIncomingFrom=name;
-            if(!videoTargetUser) videoTargetUser=name;`);
-          html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');
-          fs.writeFileSync(path.join(out,'index.html'),html);
-          EOF2
-          cat > scripts/patch-android.mjs <<'EOF2'
-          import fs from 'node:fs';const m='android/app/src/main/AndroidManifest.xml';let s=fs.readFileSync(m,'utf8');const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];for(const p of perms){const line=`<uses-permission android:name="android.permission.${p}" />`;if(!s.includes(`android.permission.${p}`))s=s.replace('<application',line+'\n    <application');}if(!s.includes('NativeLocationService'))s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n  </application>');fs.writeFileSync(m,s);
+            /* 기존 sendDm은 DB 저장 후 Broadcast도 전송 */
+            function wrapDm(){
+              if(typeof window.sendDm!=='function'||window.sendDm.__v20)return;
+              const original=window.sendDm;
+              window.sendDm=async function(){
+                const box=document.getElementById('dmInputBox');
+                const text=box?.value?.trim()||'';
+                const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                const before=dmMessagesList.length;
+                const r=await original.apply(this,arguments);
+                if(text&&target&&dmMessagesList.length>before){
+                  const row=dmMessagesList[dmMessagesList.length-1];
+                  if(row?.id)await broadcastDm(row);
+                  push({sender_name:me(),receiver_name:target,content:text},'dm');
+                }
+                return r;
+              };
+              window.sendDm.__v20=true;
+            }
+
+            /* ---------- 영상통화: 동일한 전역 lexical 변수에 직접 연결 ---------- */
+            let videoReady=false, videoInitPromise=null;
+            async function ensureVideoChannel(){
+              if(typeof sb==='undefined')return false;
+              if(typeof videoChannel!=='undefined' && videoChannel?.state==='joined')return true;
+              if(videoInitPromise)return videoInitPromise;
+              videoInitPromise=(async()=>{
+                try{
+                  if(typeof videoChannel!=='undefined' && videoChannel){try{await videoChannel.unsubscribe()}catch(e){} videoChannel=null;}
+                  videoChannel=sb.channel('woorijip-video-call-v20',{config:{broadcast:{self:false}}});
+                  videoReady=false;
+                  videoChannel.on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload));
+                  await new Promise((resolve,reject)=>{
+                    const timer=setTimeout(()=>reject(new Error('video channel timeout')),8000);
+                    videoChannel.subscribe(status=>{
+                      log('video channel',status);
+                      if(status==='SUBSCRIBED'){clearTimeout(timer);videoReady=true;resolve(true);}
+                      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){clearTimeout(timer);reject(new Error(status));}
+                    });
+                  });
+                  return true;
+                }catch(e){console.warn('[v20] video channel:',e);return false}
+                finally{videoInitPromise=null;}
+              })();
+              return videoInitPromise;
+            }
+            const originalSendVideoSignal=typeof sendVideoSignal==='function'?sendVideoSignal:null;
+            if(originalSendVideoSignal){
+              sendVideoSignal=async function(payload){
+                const ok=await ensureVideoChannel();
+                if(!ok)return false;
+                try{
+                  await videoChannel.send({type:'broadcast',event:'video',payload});
+                  return true;
+                }catch(e){console.warn('[v20] video send:',e);return false;}
+              };
+            }
+            const originalStartVideo=window.startVideoCall;
+            if(typeof originalStartVideo==='function'&&!originalStartVideo.__v20){
+              window.startVideoCall=async function(){
+                const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
+                const from=me();
+                await ensureVideoChannel();
+                if(target&&from)push({sender_name:from,receiver_name:target,content:'영상통화'},'video');
+                return originalStartVideo.apply(this,arguments);
+              };
+              window.startVideoCall.__v20=true;
+            }
+            const originalAcceptVideo=window.acceptVideoCall;
+            if(typeof originalAcceptVideo==='function'&&!originalAcceptVideo.__v20){
+              window.acceptVideoCall=async function(){await ensureVideoChannel();return originalAcceptVideo.apply(this,arguments)};
+              window.acceptVideoCall.__v20=true;
+            }
+
+            /* ---------- 초기화 ---------- */
+            async function boot(){
+              await ensureAuth();
+              await syncToken();
+              await initDmBroadcast();
+              wrapDm();
+              await ensureVideoChannel();
+            }
+            setTimeout(boot,1800);
+            setInterval(()=>{syncToken();wrapDm();initDmBroadcast();pollDm();},1500);
+          })();
+          </script>`;
+          html=html.replace(/<\/body>/i,css+js+'\n</body>');
+          fs.writeFileSync(htmlPath,html);
           EOF2
           cat > scripts/bundle-native.mjs <<'EOF2'
           import {build} from 'esbuild';await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
