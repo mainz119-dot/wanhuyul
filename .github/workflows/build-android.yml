@@ -1,5 +1,4 @@
-
-name: Build 우리집 Android APK v16 - Full Fix Crash+Location+Video
+name: Build 우리집 Android APK v17 - Video Push GPS Final Fix
 
 on:
   workflow_dispatch:
@@ -24,399 +23,126 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
           accept-android-sdk-licenses: true
-      - name: Create Capacitor project - FULL FIX
+      - name: Create Capacitor project
         shell: bash
         run: |
           set -e
           cat > package.json <<'JSON'
-          {
-            "private": true,
-            "scripts": {"build":"node scripts/prepare-web.mjs && node scripts/bundle-native.mjs"},
-            "dependencies": {
-              "@capacitor/android":"8.5.1",
-              "@capacitor/cli":"8.5.1",
-              "@capacitor/core":"8.5.1",
-              "esbuild":"0.25.9",
-              "typescript":"5.9.2"
-            }
-          }
+          {"private":true,"scripts":{"build":"node scripts/prepare-web.mjs && node scripts/bundle-native.mjs"},"dependencies":{"@capacitor/android":"8.5.1","@capacitor/cli":"8.5.1","@capacitor/core":"8.5.1","esbuild":"0.25.9","typescript":"5.9.2"}}
           JSON
           cat > capacitor.config.ts <<'EOF2'
           import type { CapacitorConfig } from '@capacitor/cli';
-          const config: CapacitorConfig={
-            appId:'com.woorijip.family',
-            appName:'우리집',
-            webDir:'www',
-            android:{useLegacyBridge:false,adjustMarginsForEdgeToEdge:'force'},
-            server:{ androidScheme:'https' }
-          };
+          const config: CapacitorConfig={appId:'com.woorijip.family',appName:'우리집',webDir:'www',android:{useLegacyBridge:false,adjustMarginsForEdgeToEdge:'force'},server:{androidScheme:'https'}};
           export default config;
           EOF2
           mkdir -p scripts native
           cat > native/native-bridge.js <<'EOF2'
-          (()=> {
-            const emit = (lat,lng,acc) => {
-              window.dispatchEvent(new CustomEvent('native-location-update', {detail:{latitude:lat, longitude:lng, accuracy:acc}}));
-              // Also save directly if Supabase lib available
-              try{
-                const body = JSON.stringify({user_name: localStorage.getItem('woorijipCurrentUser')||'', latitude:lat, longitude:lng, accuracy:acc, updated_at:new Date().toISOString()});
-                // let JS handle saving to avoid CORS key exposure here
-              }catch(e){}
-            };
-            window.addEventListener('WoorijipLocationUpdate', (e)=> emit(e.detail?.latitude, e.detail?.longitude, e.detail?.accuracy));
+          (()=>{
+            const PUSH_URL='https://ogrqjrtulhrpuuqnymkh.supabase.co/functions/v1/send-push';
+            let pushWrapped=false;
+            const native=()=>window.WoorijipNative&&typeof window.WoorijipNative.startNativeLocation==='function';
+            const me=()=>{try{return(typeof currentUser!=='undefined'&&currentUser)||localStorage.getItem('woorijipCurrentUser')||localStorage.getItem('woorijipMyName')||''}catch(e){return''}};
+            const locOn=()=>{try{return localStorage.getItem('woorijipLocationSharing')==='1'||localStorage.getItem('woorijipLocationSharingEnabled')==='1'}catch(e){return false}};
+            window.addEventListener('WoorijipLocationUpdate',e=>{const d=e.detail||{};window.dispatchEvent(new CustomEvent('native-location-update',{detail:d}));try{if(typeof window.handleNativeLocation==='function')window.handleNativeLocation(d.latitude,d.longitude,d.accuracy||0)}catch(err){}});
+            async function push(record,type){try{await fetch(PUSH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record,type})})}catch(e){console.warn('push call failed',e)}}
+            async function confirmAndPush(type,record,text,started){try{if(typeof sb==='undefined')return;const table=type==='dm'?'direct_messages':'family_messages';let q=sb.from(table).select('id,created_at').eq('sender_name',record.sender_name).eq('content',text).gte('created_at',new Date(started-10000).toISOString()).order('created_at',{ascending:false}).limit(1);if(type==='dm')q=q.eq('receiver_name',record.receiver_name);const {data,error}=await q;if(error||!data?.length)return;await push(record,type==='dm'?'chat':'group')}catch(e){console.warn('push confirm failed',e)}}
+            function wrap(){
+              if(pushWrapped||typeof window.sendDm!=='function'||typeof window.sendGroup!=='function')return;
+              pushWrapped=true;
+              const dm=window.sendDm;window.sendDm=async function(...a){const started=Date.now();let text='',to='';try{text=(document.getElementById('dmInputBox')?.value||document.getElementById('dmInput')?.value||'').trim();to=(typeof family!=='undefined'&&family[activePersonIndex])||''}catch(e){}const r=await dm.apply(this,a);if(text&&to&&me())await confirmAndPush('dm',{sender_name:me(),receiver_name:to,content:text},text,started);return r};
+              const group=window.sendGroup;window.sendGroup=async function(...a){const started=Date.now();let text='';try{text=(document.getElementById('groupInputBox')?.value||'').trim()}catch(e){}const r=await group.apply(this,a);if(text&&me())await confirmAndPush('group',{sender_name:me(),content:text},text,started);return r};
+            }
+            function keep(){if(!native())return;const u=me();if(!u)return;try{WoorijipNative.setLocationUser(u);if(locOn())WoorijipNative.startNativeLocation();else WoorijipNative.stopNativeLocation()}catch(e){console.warn('native GPS bridge',e)}}
+            setTimeout(()=>{keep();wrap()},1500);setInterval(()=>{keep();wrap()},5000);
           })();
           EOF2
           cat > scripts/prepare-web.mjs <<'EOF2'
-          import fs from 'node:fs'; import path from 'node:path';
-          const root=process.cwd(), out=path.join(root,'www');
-          const excluded=new Set(['.git','.github','android','www','node_modules','native','scripts','package.json','package-lock.json','capacitor.config.ts']);
-          fs.rmSync(out,{recursive:true,force:true}); fs.mkdirSync(out,{recursive:true});
-          for(const name of fs.readdirSync(root)){if(excluded.has(name))continue;fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true});}
-          let html=fs.readFileSync(path.join(out,'index.html'),'utf8');
-          if(!html.includes('native-bridge.js')) html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');
-          fs.writeFileSync(path.join(out,'index.html'),html);
+          import fs from 'node:fs';import path from 'node:path';
+          const root=process.cwd(),out=path.join(root,'www');const excluded=new Set(['.git','.github','android','www','node_modules','native','scripts','package.json','package-lock.json','capacitor.config.ts']);
+          fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});for(const name of fs.readdirSync(root)){if(excluded.has(name))continue;fs.cpSync(path.join(root,name),path.join(out,name),{recursive:true})}
+          let html=fs.readFileSync(path.join(out,'index.html'),'utf8');html=html.replace(/<\/body>/i,'<script type="module" src="./native-bridge.js"></script></body>');fs.writeFileSync(path.join(out,'index.html'),html);
           EOF2
           cat > scripts/bundle-native.mjs <<'EOF2'
-          import {build} from 'esbuild'; await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
+          import {build} from 'esbuild';await build({entryPoints:['./native/native-bridge.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',outfile:'www/native-bridge.js'});
           EOF2
-          npm install
-          npm run build
-          npx cap add android
-          npx cap sync android
-
+          npm install && npm run build && npx cap add android && npx cap sync android
           python3 - <<'PY'
           from pathlib import Path
-          root=Path('android/build.gradle'); s=root.read_text()
-          if 'com.google.gms:google-services' not in s:
-            s=s.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.3'", 1)
+          root=Path('android/build.gradle');s=root.read_text()
+          if 'com.google.gms:google-services' not in s:s=s.replace('dependencies {',"dependencies {\n        classpath 'com.google.gms:google-services:4.4.3'",1)
           root.write_text(s)
-          app=Path('android/app/build.gradle'); s=app.read_text()
-          if 'com.google.gms.google-services' not in s:
-            s += "\napply plugin: 'com.google.gms.google-services'\n"
+          app=Path('android/app/build.gradle');s=app.read_text();deps=[]
+          if 'play-services-location' not in s:deps.append("implementation 'com.google.android.gms:play-services-location:21.3.0'")
+          if 'firebase-messaging' not in s:deps.append("implementation 'com.google.firebase:firebase-messaging:24.1.0'")
+          if deps:s+='\n\ndependencies {\n'+'\n'.join('  '+d for d in deps)+'\n}\n'
+          if 'com.google.gms.google-services' not in s:s+="\napply plugin: 'com.google.gms.google-services'\n"
           app.write_text(s)
           PY
           mkdir -p android/app
-          echo 'eyJwcm9qZWN0X2luZm8iOnsicHJvamVjdF9udW1iZXIiOiIzOTM4Nzc4NTcyMzgiLCJwcm9qZWN0X2lkIjoid29vcmlqaXBmYW1pbHkiLCJzdG9yYWdlX2J1Y2tldCI6Indvb3JpamlwZmFtaWx5LmZpcmViYXNlc3RvcmFnZS5hcHAifSwiY2xpZW50IjpbeyJjbGllbnRfaW5mbyI6eyJtb2JpbGVzZGtfYXBwX2lkIjoiMTozOTM4Nzc4NTcyMzg6YW5kcm9pZDozYWFlZDliN2RlNTIyNDk0MTBiYTc3IiwiYW5kcm9pZF9jbGllbnRfaW5mbyI6eyJwYWNrYWdlX25hbWUiOiJjb20ud29vcmlqaXAuZmFtaWx5In19LCJvYXV0aF9jbGllbnQiOltdLCJhcGlfa2V5IjpbeyJjdXJyZW50X2tleSI6IkFJemFTeUJVYmlVUFk1elBteWpJOFdFalRDZmJpeTBIOWd5T0YxcyJ9XSwic2VydmljZXMiOnsiYXBwaW52aXRlX3NlcnZpY2UiOnsib3RoZXJfcGxhdGZvcm1fb2F1dGhfY2xpZW50IjpbXX19fV0sImNvbmZpZ3VyYXRpb25fdmVyc2lvbiI6IjEifQ==' | base64 --decode > android/app/google-services.json
-
-          # === FIXED MainActivity.java - handles GPS, Camera, Mic permissions correctly ===
+          echo 'eyJwcm9qZWN0X2luZm8iOnsicHJvamVjdF9udW1iZXIiOiIzOTM4Nzc4NTcyMzgiLCJwcm9qZWN0X2lkIjoid29vcmlqaXBmYW1pbHkiLCJzdG9yYWdlX2J1Y2tldCI6Indvb3JpamlwZmFtaWx5LmZpcmViYXNlc3RvcmFnZS5hcHAifSwiY2xpZW50IjpbeyJjbGllbnRfaW5mbyI6eyJtb2JpbGVzZGtfYXBwX2lkIjoiMTozOTM4Nzc4NTcyMzg6YW5kcm9pZDozYWFlZDliN2RlNTIyNDk0MTBiYTc3IiwiYW5kcm9pZF9jbGllbnRfaW5mbyI6eyJwYWNrYWdlX25hbWUiOiJjb20ud29vcmlqaXAuZmFtaWx5In19LCJvYXV0aF9jbGllbnQiOltdLCJhcGlfa2V5IjpbeyJjdXJyZW50X2tleSI6IkFJemFTeUJVYmlVUFk1elBteWpJOFdFalRDZmJpeTBIOWd5T0YxcyJ9XSwic2VydmljZXMiOnsiYXBwaW52aXRlX3NlcnZpY2UiOnsib3RoZXJfcGxhdGZvcm1fb2F1dGhfY2xpZW50IjpbXX19fV0sImNvbmZpZ3VyYXRpb25fdmVyc2lvbiI6IjEifQ=='|base64 --decode > android/app/google-services.json
           cat > android/app/src/main/java/com/woorijip/family/MainActivity.java <<'EOF2'
           package com.woorijip.family;
-          import android.Manifest;
-          import android.content.*;
-          import android.content.pm.PackageManager;
-          import android.os.*;
-          import android.webkit.*;
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
-          import com.getcapacitor.BridgeActivity;
-          import com.google.firebase.messaging.FirebaseMessaging;
-
-          public class MainActivity extends BridgeActivity {
-            static final int PERM=9001;
-            static final String PREF="woorijip_native";
-            private BroadcastReceiver locationReceiver;
-
-            public class NativeBridge {
+          import android.Manifest;import android.content.*;import android.content.pm.PackageManager;import android.os.*;import android.webkit.*;import androidx.annotation.NonNull;import androidx.core.app.ActivityCompat;import androidx.core.content.ContextCompat;import com.getcapacitor.BridgeActivity;import com.google.firebase.messaging.FirebaseMessaging;
+          public class MainActivity extends BridgeActivity{
+            static final int PERM=9001;static final String PREF="woorijip_native";private BroadcastReceiver locationReceiver;private PermissionRequest pendingWebPermission;private GeolocationPermissions.Callback pendingGeoCallback;private String pendingGeoOrigin;
+            public class NativeBridge{
               @JavascriptInterface public String getFcmToken(){return getSharedPreferences(PREF,0).getString("fcm_token","");}
               @JavascriptInterface public String getPendingPush(){return getSharedPreferences(PREF,0).getString("pending_push","");}
               @JavascriptInterface public void clearPendingPush(){getSharedPreferences(PREF,0).edit().remove("pending_push").apply();}
-              @JavascriptInterface public void setLocationUser(String u){
-                getSharedPreferences(PREF,0).edit().putString("user_name",u).apply();
-                getSharedPreferences("woorijip_prefs",0).edit().putString("current_user",u).apply();
-                getSharedPreferences(PREF,0).edit().putString("current_user",u).apply();
-              }
-              @JavascriptInterface public void startNativeLocation(){
-                getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",true).apply();
-                try{ ContextCompat.startForegroundService(MainActivity.this,new Intent(MainActivity.this,NativeLocationService.class)); }
-                catch(Exception e){ android.util.Log.e("WoorijipNative","start",e); }
-              }
-              @JavascriptInterface public void stopNativeLocation(){
-                getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",false).apply();
-                try{ stopService(new Intent(MainActivity.this,NativeLocationService.class)); }catch(Exception ignored){}
-              }
+              @JavascriptInterface public void setLocationUser(String u){getSharedPreferences(PREF,0).edit().putString("user_name",u).putString("current_user",u).apply();}
+              @JavascriptInterface public void startNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",true).apply();try{ContextCompat.startForegroundService(MainActivity.this,new Intent(MainActivity.this,NativeLocationService.class));}catch(Exception e){android.util.Log.e("WoorijipNative","GPS start",e);}}
+              @JavascriptInterface public void stopNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",false).apply();try{stopService(new Intent(MainActivity.this,NativeLocationService.class));}catch(Exception ignored){}}
             }
-
-            @Override public void onCreate(Bundle b){
-              super.onCreate(b);
-              requestPermissionsNow();
-              WebView w=null;
-              try{ w=getBridge().getWebView(); }catch(Exception e){ android.util.Log.w("MainActivity","getWebView",e); }
-              if(w!=null){
-                try{
-                  w.getSettings().setGeolocationEnabled(true);
-                  w.getSettings().setDatabaseEnabled(true);
-                  w.getSettings().setDomStorageEnabled(true);
-                  w.getSettings().setMediaPlaybackRequiresUserGesture(false);
-                  w.getSettings().setJavaScriptEnabled(true);
-                  w.getSettings().setAllowFileAccess(true);
-                }catch(Exception e){}
-
-                w.setWebChromeClient(new WebChromeClient(){
-                  @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback){
-                    callback.invoke(origin,true,false);
-                  }
-                  @Override public void onPermissionRequest(PermissionRequest request){
-                    runOnUiThread(()->{
-                      try{ request.grant(request.getResources()); }catch(Exception e){ try{ request.deny(); }catch(Exception ignored){} }
-                    });
-                  }
-                });
-                w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");
-              }
-
-              // Location broadcast receiver -> forward to WebView JS
-              locationReceiver = new BroadcastReceiver(){
-                @Override public void onReceive(Context ctx, Intent intent){
-                  if("com.woorijip.family.LOCATION_UPDATE".equals(intent.getAction())){
-                    double lat=intent.getDoubleExtra("latitude",0);
-                    double lng=intent.getDoubleExtra("longitude",0);
-                    float acc=intent.getFloatExtra("accuracy",0);
-                    WebView webViewTmp=null;
-                    try{ webViewTmp=getBridge().getWebView(); }catch(Exception e){}
-                    if(webViewTmp!=null){
-                      String jsTmp = String.format("try{window.handleNativeLocation && window.handleNativeLocation(%f,%f,%f); window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}", lat,lng,acc, lat,lng,acc);
-                      final WebView fWeb = webViewTmp;
-                      final String fJs = jsTmp;
-                      fWeb.post(()-> fWeb.evaluateJavascript(fJs, null));
-                    }
-                  }
-                }
-              };
-              try{
-                if(Build.VERSION.SDK_INT>=33){
-                  registerReceiver(locationReceiver, new IntentFilter("com.woorijip.family.LOCATION_UPDATE"), Context.RECEIVER_NOT_EXPORTED);
-                } else {
-                  registerReceiver(locationReceiver, new IntentFilter("com.woorijip.family.LOCATION_UPDATE"));
-                }
-              }catch(Exception e){ android.util.Log.w("MainActivity","registerReceiver",e); }
-
-              try{
-                FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->{
-                  getSharedPreferences(PREF,0).edit().putString("fcm_token",t).apply();
-                });
-              }catch(Exception e){}
-              handlePushIntent(getIntent());
-            }
-
-            @Override public void onDestroy(){
-              try{ if(locationReceiver!=null) unregisterReceiver(locationReceiver); }catch(Exception ignored){}
-              super.onDestroy();
-            }
-
-            @Override protected void onNewIntent(Intent intent){
-              super.onNewIntent(intent);
-              handlePushIntent(intent);
-            }
-
-            void handlePushIntent(Intent intent){
-              if(intent!=null && intent.getExtras()!=null){
-                Bundle ex=intent.getExtras();
-                String type=ex.getString("type");
-                if(type!=null){
-                  try{
-                    org.json.JSONObject o=new org.json.JSONObject();
-                    for(String k: ex.keySet()){
-                      Object v=ex.get(k);
-                      if(v!=null) o.put(k, v.toString());
-                    }
-                    getSharedPreferences(PREF,0).edit().putString("pending_push", o.toString()).apply();
-                  }catch(Exception e){}
-                }
-              }
-            }
-
-            void requestPermissionsNow(){
-              java.util.ArrayList<String> list=new java.util.ArrayList<>();
-              String[] perms={
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.CAMERA,
-                Manifest.permission.RECORD_AUDIO
-              };
-              for(String p: perms) if(ContextCompat.checkSelfPermission(this,p)!=PackageManager.PERMISSION_GRANTED) list.add(p);
-              if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
-                list.add(Manifest.permission.POST_NOTIFICATIONS);
-              }
-              if(!list.isEmpty()){
-                try{ ActivityCompat.requestPermissions(this, list.toArray(new String[0]), PERM); }catch(Exception e){}
-              }
-              // Background location은 별도로 나중에 요청 (Android 11+에서 한번에 요청하면 거부됨)
-              if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
-                // 3초 뒤에 별도 요청
-                new Handler(Looper.getMainLooper()).postDelayed(()->{
-                  try{
-                    if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
-                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION}, PERM+1);
-                    }
-                  }catch(Exception e){}
-                }, 3000);
-              }
-            }
+            @Override public void onCreate(Bundle b){super.onCreate(b);requestPermissionsNow();WebView w=null;try{w=getBridge().getWebView();}catch(Exception e){}if(w!=null){WebSettings st=w.getSettings();st.setJavaScriptEnabled(true);st.setDomStorageEnabled(true);st.setDatabaseEnabled(true);st.setGeolocationEnabled(true);st.setMediaPlaybackRequiresUserGesture(false);st.setAllowFileAccess(true);w.setWebChromeClient(new WebChromeClient(){
+              @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback cb){if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)cb.invoke(origin,true,false);else{pendingGeoOrigin=origin;pendingGeoCallback=cb;ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},PERM+2);}}
+              @Override public void onPermissionRequest(PermissionRequest r){runOnUiThread(()->handleWebPermission(r));}
+            });w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");}
+              locationReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){if(!"com.woorijip.family.LOCATION_UPDATE".equals(i.getAction()))return;double lat=i.getDoubleExtra("latitude",0),lng=i.getDoubleExtra("longitude",0);float acc=i.getFloatExtra("accuracy",0);try{WebView v=getBridge().getWebView();if(v!=null){String js=String.format(java.util.Locale.US,"try{if(window.handleNativeLocation)window.handleNativeLocation(%f,%f,%f);window.dispatchEvent(new CustomEvent('native-location-update',{detail:{latitude:%f,longitude:%f,accuracy:%f}}));}catch(e){}",lat,lng,acc,lat,lng,acc);v.post(()->v.evaluateJavascript(js,null));}}catch(Exception e){}}};
+              try{if(Build.VERSION.SDK_INT>=33)registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"),Context.RECEIVER_NOT_EXPORTED);else registerReceiver(locationReceiver,new IntentFilter("com.woorijip.family.LOCATION_UPDATE"));}catch(Exception e){}
+              try{FirebaseMessaging.getInstance().getToken().addOnSuccessListener(t->getSharedPreferences(PREF,0).edit().putString("fcm_token",t).apply());}catch(Exception e){}handlePushIntent(getIntent());}
+            void handleWebPermission(PermissionRequest r){boolean cam=false,mic=false;for(String x:r.getResources()){if(PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(x))cam=true;if(PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(x))mic=true;}boolean co=!cam||ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED;boolean mo=!mic||ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED;if(co&&mo){try{r.grant(r.getResources());}catch(Exception e){try{r.deny();}catch(Exception ignored){}}return;}pendingWebPermission=r;java.util.ArrayList<String>p=new java.util.ArrayList<>();if(cam&&!co)p.add(Manifest.permission.CAMERA);if(mic&&!mo)p.add(Manifest.permission.RECORD_AUDIO);if(!p.isEmpty())ActivityCompat.requestPermissions(this,p.toArray(new String[0]),PERM+3);else try{r.deny();}catch(Exception ignored){}}
+            @Override public void onRequestPermissionsResult(int rc,@NonNull String[] ps,@NonNull int[] rs){super.onRequestPermissionsResult(rc,ps,rs);if(rc==PERM+3&&pendingWebPermission!=null){boolean ok=ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED&&ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED;try{if(ok)pendingWebPermission.grant(pendingWebPermission.getResources());else pendingWebPermission.deny();}catch(Exception ignored){}pendingWebPermission=null;}if(rc==PERM+2&&pendingGeoCallback!=null){boolean ok=ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED;try{pendingGeoCallback.invoke(pendingGeoOrigin,ok,false);}catch(Exception ignored){}pendingGeoCallback=null;pendingGeoOrigin=null;}}
+            @Override public void onDestroy(){try{if(locationReceiver!=null)unregisterReceiver(locationReceiver);}catch(Exception ignored){}super.onDestroy();}
+            @Override protected void onNewIntent(Intent i){super.onNewIntent(i);handlePushIntent(i);}
+            void handlePushIntent(Intent i){if(i==null||i.getExtras()==null)return;Bundle e=i.getExtras();String type=e.getString("type");if(type==null)return;try{org.json.JSONObject o=new org.json.JSONObject();for(String k:e.keySet()){Object v=e.get(k);if(v!=null)o.put(k,v.toString());}getSharedPreferences(PREF,0).edit().putString("pending_push",o.toString()).apply();}catch(Exception ignored){}}
+            void requestPermissionsNow(){java.util.ArrayList<String>l=new java.util.ArrayList<>();String[]p={Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO};for(String x:p)if(ContextCompat.checkSelfPermission(this,x)!=PackageManager.PERMISSION_GRANTED)l.add(x);if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)l.add(Manifest.permission.POST_NOTIFICATIONS);if(!l.isEmpty())try{ActivityCompat.requestPermissions(this,l.toArray(new String[0]),PERM);}catch(Exception ignored){}if(Build.VERSION.SDK_INT>=30&&ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED)new Handler(Looper.getMainLooper()).postDelayed(()->{try{if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED)ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},PERM+1);}catch(Exception ignored){}},4000);}
           }
           EOF2
-
-          # === NEW: Firebase Messaging Service for push notifications ===
           cat > android/app/src/main/java/com/woorijip/family/MyFirebaseService.java <<'EOF2'
           package com.woorijip.family;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.content.Intent;
-          import android.os.Build;
-          import androidx.core.app.NotificationCompat;
-          import com.google.firebase.messaging.FirebaseMessagingService;
-          import com.google.firebase.messaging.RemoteMessage;
-          import org.json.JSONObject;
-
-          public class MyFirebaseService extends FirebaseMessagingService {
-            static final String CH_PUSH="woorijip_push";
-            @Override public void onNewToken(String token){
-              super.onNewToken(token);
-              getSharedPreferences("woorijip_native",0).edit().putString("fcm_token",token).apply();
-            }
-            @Override public void onMessageReceived(RemoteMessage msg){
-              super.onMessageReceived(msg);
-              String title="완후율";
-              String body="새 메시지가 있어요";
-              String type="chat";
-              String from="";
-              if(msg.getNotification()!=null){
-                if(msg.getNotification().getTitle()!=null) title=msg.getNotification().getTitle();
-                if(msg.getNotification().getBody()!=null) body=msg.getNotification().getBody();
-              }
-              if(msg.getData()!=null && !msg.getData().isEmpty()){
-                if(msg.getData().containsKey("title")) title=msg.getData().get("title");
-                if(msg.getData().containsKey("body")) body=msg.getData().get("body");
-                if(msg.getData().containsKey("type")) type=msg.getData().get("type");
-                if(msg.getData().containsKey("from")) from=msg.getData().get("from");
-              }
-              // Save pending push for when app is opened
-              try{
-                JSONObject o=new JSONObject();
-                o.put("title",title); o.put("body",body); o.put("type",type); o.put("from",from);
-                getSharedPreferences("woorijip_native",0).edit().putString("pending_push",o.toString()).apply();
-              }catch(Exception ignored){}
-
-              NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-              if(Build.VERSION.SDK_INT>=26){
-                nm.createNotificationChannel(new NotificationChannel(CH_PUSH,"완후율 알림",NotificationManager.IMPORTANCE_HIGH));
-              }
-              Intent intent=new Intent(this, MainActivity.class);
-              intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-              intent.putExtra("type",type);
-              intent.putExtra("from",from);
-              intent.putExtra("title",title);
-              intent.putExtra("body",body);
-              PendingIntent pi=PendingIntent.getActivity(this,0,intent,PendingIntent.FLAG_ONE_SHOT|PendingIntent.FLAG_IMMUTABLE);
-
-              NotificationCompat.Builder b=new NotificationCompat.Builder(this,CH_PUSH)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setAutoCancel(true)
-                .setContentIntent(pi)
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
-
-              nm.notify((int)System.currentTimeMillis(), b.build());
-            }
+          import android.app.*;import android.content.*;import android.os.Build;import androidx.core.app.NotificationCompat;import com.google.firebase.messaging.FirebaseMessagingService;import com.google.firebase.messaging.RemoteMessage;import org.json.JSONObject;
+          public class MyFirebaseService extends FirebaseMessagingService{
+            static final String CH="woorijip_push";
+            @Override public void onNewToken(String t){super.onNewToken(t);getSharedPreferences("woorijip_native",0).edit().putString("fcm_token",t).apply();}
+            @Override public void onMessageReceived(RemoteMessage m){super.onMessageReceived(m);String title="완후율",body="새 메시지가 있어요",type="chat",from="";if(m.getNotification()!=null){if(m.getNotification().getTitle()!=null)title=m.getNotification().getTitle();if(m.getNotification().getBody()!=null)body=m.getNotification().getBody();}if(!m.getData().isEmpty()){if(m.getData().containsKey("title"))title=m.getData().get("title");if(m.getData().containsKey("body"))body=m.getData().get("body");if(m.getData().containsKey("type"))type=m.getData().get("type");if(m.getData().containsKey("from"))from=m.getData().get("from");}try{JSONObject o=new JSONObject();o.put("title",title);o.put("body",body);o.put("type",type);o.put("from",from);getSharedPreferences("woorijip_native",0).edit().putString("pending_push",o.toString()).apply();}catch(Exception ignored){}NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CH,"완후율 알림",NotificationManager.IMPORTANCE_HIGH));Intent i=new Intent(this,MainActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);i.putExtra("type",type);i.putExtra("from",from);i.putExtra("title",title);i.putExtra("body",body);PendingIntent pi=PendingIntent.getActivity(this,(int)(System.currentTimeMillis()&0x7fffffff),i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);NotificationCompat.Builder b=new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(pi);nm.notify((int)(System.currentTimeMillis()&0x7fffffff),b.build());}
           }
           EOF2
-
           cat > android/app/src/main/java/com/woorijip/family/NativeLocationService.java <<'EOF2'
           package com.woorijip.family;
-          import android.Manifest;
-          import android.app.*;
-          import android.content.*;
-          import android.content.pm.PackageManager;
-          import android.os.*;
-          import androidx.annotation.NonNull;
-          import androidx.core.app.NotificationCompat;
-          import com.google.android.gms.location.*;
-          import java.io.*; import java.net.*; import org.json.*;
-          public class NativeLocationService extends Service {
-            static final String CH="woorijip_location";
-            FusedLocationProviderClient client; LocationCallback callback;
-            @Override public int onStartCommand(Intent i,int flags,int id){
-              createChannel();
-              if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
-                return START_NOT_STICKY;
-              }
-              startForeground(7001,new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_menu_compass).setContentTitle("우리집 위치 공유").setContentText("가족 위치를 안전하게 업데이트하고 있어요").setOngoing(true).build());
-              start();
-              return START_STICKY;
-            }
-            void createChannel(){
-              if(Build.VERSION.SDK_INT>=26){
-                ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"우리집 위치 공유",NotificationManager.IMPORTANCE_LOW));
-              }
-            }
-            void start(){
-              if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
-                stopSelf(); return;
-              }
-              client=LocationServices.getFusedLocationProviderClient(this);
-              LocationRequest r=new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,15000).setMinUpdateIntervalMillis(8000).setMinUpdateDistanceMeters(10).build();
-              callback=new LocationCallback(){
-                @Override public void onLocationResult(@NonNull LocationResult lr){
-                  for(android.location.Location l:lr.getLocations()) send(l.getLatitude(),l.getLongitude(),l.getAccuracy());
-                }
-              };
-              client.requestLocationUpdates(r,callback,Looper.getMainLooper());
-              client.getLastLocation().addOnSuccessListener(l->{ if(l!=null) send(l.getLatitude(),l.getLongitude(),l.getAccuracy()); });
-            }
-            void send(double lat,double lng,float acc){
-              try{
-                android.content.SharedPreferences p=getSharedPreferences("woorijip_native",0);
-                String u=p.getString("user_name","");
-                if(u.isEmpty() || !p.getBoolean("location_enabled",false)) return;
-                URL url=new URL("https://ogrqjrtulhrpuuqnymkh.supabase.co/rest/v1/family_locations?on_conflict=user_name");
-                HttpURLConnection c=(HttpURLConnection)url.openConnection();
-                c.setRequestMethod("POST"); c.setDoOutput(true);
-                c.setRequestProperty("Content-Type","application/json");
-                c.setRequestProperty("apikey","sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");
-                c.setRequestProperty("Authorization","Bearer sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");
-                c.setRequestProperty("Prefer","resolution=merge-duplicates");
-                JSONObject o=new JSONObject();
-                o.put("user_name",u); o.put("latitude",lat); o.put("longitude",lng); o.put("accuracy",acc);
-                o.put("updated_at", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",java.util.Locale.US).format(new java.util.Date()));
-                OutputStream os=c.getOutputStream(); os.write(o.toString().getBytes("UTF-8")); os.close();
-                c.getResponseCode(); c.disconnect();
-                // Broadcast to WebView
-                Intent intent=new Intent("com.woorijip.family.LOCATION_UPDATE");
-                intent.putExtra("latitude",lat); intent.putExtra("longitude",lng); intent.putExtra("accuracy",acc);
-                sendBroadcast(intent);
-              }catch(Exception e){ android.util.Log.w("WoorijipGPS",e.toString()); }
-            }
-            @Override public void onDestroy(){ if(client!=null && callback!=null) client.removeLocationUpdates(callback); super.onDestroy(); }
-            @Override public android.os.IBinder onBind(Intent i){ return null; }
+          import android.Manifest;import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.os.*;import androidx.annotation.NonNull;import androidx.core.app.NotificationCompat;import com.google.android.gms.location.*;import java.io.*;import java.net.*;import org.json.*;
+          public class NativeLocationService extends Service{
+            static final String CH="woorijip_location";FusedLocationProviderClient client;LocationCallback callback;
+            @Override public void onCreate(){super.onCreate();createChannel();}
+            @Override public int onStartCommand(Intent i,int f,int id){Notification n=new NotificationCompat.Builder(this,CH).setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("완후율 위치 공유").setContentText("가족에게 현재 위치를 공유하고 있어요").setOngoing(true).setPriority(NotificationCompat.PRIORITY_LOW).build();try{if(Build.VERSION.SDK_INT>=29)startForeground(7,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);else startForeground(7,n);}catch(Exception e){android.util.Log.e("WoorijipGPS","startForeground",e);stopSelf();return START_NOT_STICKY;}startUpdates();return START_STICKY;}
+            void startUpdates(){if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED&&checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopSelf();return;}client=LocationServices.getFusedLocationProviderClient(this);LocationRequest r=new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,10000).setMinUpdateIntervalMillis(5000).setMinUpdateDistanceMeters(5).build();callback=new LocationCallback(){@Override public void onLocationResult(@NonNull LocationResult lr){for(android.location.Location l:lr.getLocations())send(l.getLatitude(),l.getLongitude(),l.getAccuracy());}};try{client.requestLocationUpdates(r,callback,Looper.getMainLooper()).addOnFailureListener(e->android.util.Log.e("WoorijipGPS","requestLocationUpdates",e));client.getLastLocation().addOnSuccessListener(l->{if(l!=null)send(l.getLatitude(),l.getLongitude(),l.getAccuracy());});}catch(Exception e){android.util.Log.e("WoorijipGPS","location",e);}}
+            void send(double lat,double lng,float acc){new Thread(()->{HttpURLConnection c=null;try{android.content.SharedPreferences p=getSharedPreferences("woorijip_native",0);String u=p.getString("user_name","");if(u.isEmpty()||!p.getBoolean("location_enabled",false))return;URL url=new URL("https://ogrqjrtulhrpuuqnymkh.supabase.co/rest/v1/family_locations?on_conflict=user_name");c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(8000);c.setReadTimeout(8000);c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("apikey","sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");c.setRequestProperty("Authorization","Bearer sb_publishable_gDdHqSfhl28EboFlW-dORA_XJrYZVqN");c.setRequestProperty("Prefer","resolution=merge-duplicates,return=minimal");JSONObject o=new JSONObject();o.put("user_name",u);o.put("latitude",lat);o.put("longitude",lng);o.put("accuracy",acc);o.put("updated_at",new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",java.util.Locale.US).format(new java.util.Date()));try(OutputStream os=c.getOutputStream()){os.write(o.toString().getBytes("UTF-8"));}int code=c.getResponseCode();android.util.Log.d("WoorijipGPS","Supabase="+code+" user="+u);Intent b=new Intent("com.woorijip.family.LOCATION_UPDATE");b.setPackage(getPackageName());b.putExtra("latitude",lat);b.putExtra("longitude",lng);b.putExtra("accuracy",acc);sendBroadcast(b);}catch(Exception e){android.util.Log.e("WoorijipGPS","send",e);}finally{if(c!=null)c.disconnect();}}).start();}
+            void createChannel(){if(Build.VERSION.SDK_INT>=26){NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.createNotificationChannel(new NotificationChannel(CH,"위치 공유",NotificationManager.IMPORTANCE_LOW));}}
+            @Override public void onDestroy(){try{if(client!=null&&callback!=null)client.removeLocationUpdates(callback);}catch(Exception ignored){}super.onDestroy();}@Override public IBinder onBind(Intent i){return null;}
           }
           EOF2
-
           cat > scripts/patch-android.mjs <<'EOF2'
-          import fs from 'node:fs';
-          const m='android/app/src/main/AndroidManifest.xml'; let s=fs.readFileSync(m,'utf8');
-          const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];
-          for(const p of perms) if(!s.includes('android.permission.'+p)) s=s.replace('<application','<uses-permission android:name="android.permission.'+p+'" />\n    <application');
-          s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n    </application>');
-          fs.writeFileSync(m,s);
+          import fs from 'node:fs';const m='android/app/src/main/AndroidManifest.xml';let s=fs.readFileSync(m,'utf8');const perms=['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS','CAMERA','RECORD_AUDIO'];for(const p of perms){const line=`<uses-permission android:name="android.permission.${p}" />`;if(!s.includes(`android.permission.${p}`))s=s.replace('<application',line+'\n    <application');}if(!s.includes('NativeLocationService'))s=s.replace('</application>','<service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" />\n  <service android:name=".MyFirebaseService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service>\n  </application>');fs.writeFileSync(m,s);
           EOF2
           node scripts/patch-android.mjs
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('android/app/build.gradle'); s=p.read_text()
-          if 'play-services-location' not in s:
-            s += "\ndependencies { implementation 'com.google.android.gms:play-services-location:21.3.0' }\n"
-          if 'firebase-messaging' not in s:
-            s += "\ndependencies { implementation 'com.google.firebase:firebase-messaging:24.1.0' }\n"
-          p.write_text(s)
-          PY
-      - name: Build Debug APK
+      - name: Build debug APK
+        shell: bash
         run: |
+          set -e
           cd android
           ./gradlew assembleDebug --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: 우리집-debug-v16-fullfix
+          name: wanhuyul-apk-v17
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
