@@ -310,42 +310,17 @@ jobs:
               }
             }
 
-            /* ---------- 영상통화: 동일한 전역 lexical 변수에 직접 연결 ---------- */
-            let videoReady=false, videoInitPromise=null;
+            /* ---------- 영상통화 ---------- */
+            /* v24: 여기서 별도 채널('woorijip-video-call-v20')을 새로 만들지 않는다.
+               예전엔 이 함수가 앱 초기화 타이밍에 따라 원본 index.html의 initVideoCalling()이
+               만든 videoChannel(1:1 전용 채널명)을 통째로 다른 이름의 채널로 바꿔치기할 수 있어서,
+               거는 쪽/받는 쪽이 서로 다른 채널을 구독하게 되어 offer/answer가 절대 도착하지
+               않는 경우가 있었다(푸시는 오는데 연결만 안 되던 원인). 채널 생성/구독은 원본의
+               initVideoCalling() 하나로 통일하고, 여기서는 그게 이미 돼 있는지만 보장한다. */
             async function ensureVideoChannel(){
               if(typeof sb==='undefined')return false;
-              if(typeof videoChannel!=='undefined' && videoChannel?.state==='joined')return true;
-              if(videoInitPromise)return videoInitPromise;
-              videoInitPromise=(async()=>{
-                try{
-                  if(typeof videoChannel!=='undefined' && videoChannel){try{await videoChannel.unsubscribe()}catch(e){} videoChannel=null;}
-                  videoChannel=sb.channel('woorijip-video-call-v20',{config:{broadcast:{self:false}}});
-                  videoReady=false;
-                  videoChannel.on('broadcast',{event:'video'},({payload})=>handleVideoSignal(payload));
-                  await new Promise((resolve,reject)=>{
-                    const timer=setTimeout(()=>reject(new Error('video channel timeout')),8000);
-                    videoChannel.subscribe(status=>{
-                      log('video channel',status);
-                      if(status==='SUBSCRIBED'){clearTimeout(timer);videoReady=true;resolve(true);}
-                      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){clearTimeout(timer);reject(new Error(status));}
-                    });
-                  });
-                  return true;
-                }catch(e){console.warn('[v20] video channel:',e);return false}
-                finally{videoInitPromise=null;}
-              })();
-              return videoInitPromise;
-            }
-            const originalSendVideoSignal=typeof sendVideoSignal==='function'?sendVideoSignal:null;
-            if(originalSendVideoSignal){
-              sendVideoSignal=async function(payload){
-                const ok=await ensureVideoChannel();
-                if(!ok)return false;
-                try{
-                  await videoChannel.send({type:'broadcast',event:'video',payload});
-                  return true;
-                }catch(e){console.warn('[v20] video send:',e);return false;}
-              };
+              if(typeof initVideoCalling==='function') await initVideoCalling();
+              return typeof videoChannel!=='undefined' && !!videoChannel;
             }
             const originalStartVideo=window.startVideoCall;
             if(typeof originalStartVideo==='function'&&!originalStartVideo.__v20){
@@ -375,12 +350,18 @@ jobs:
               await pollDm();
             }
             setTimeout(boot,1200);
+            let __locPollTick=0;
             setInterval(()=>{
               syncToken();
               wrapDm();
               wrapGroupAndPhoto();
               if(document.getElementById('dm')?.classList.contains('active')){ initDmBroadcast(); pollDm(); }
               ensureVideoChannel();
+              /* v24: family_locations realtime이 꺼져 있거나 지연되는 경우를 대비해
+                 15초마다 한 번씩 직접 재조회해서 위치 공유 상태 표시가 실제 서버 상태와
+                 어긋나지 않도록 한다. */
+              __locPollTick++;
+              if(__locPollTick%15===0 && typeof window.loadFamilyLocations==='function') window.loadFamilyLocations();
             },1000);
           })();
           </script>`;
@@ -460,7 +441,7 @@ jobs:
               super.onMessageReceived(m);
               String title="완후율",body="새 메시지가 있어요",type="chat",from="";
               if(m.getNotification()!=null){if(m.getNotification().getTitle()!=null)title=m.getNotification().getTitle();if(m.getNotification().getBody()!=null)body=m.getNotification().getBody();}
-              if(!m.getData().isEmpty()){if(m.getData().containsKey("title"))title=m.getData().get("title");if(m.getData().containsKey("body"))body=m.getData().get("body");if(m.getData().containsKey("type"))type=m.getData().get("type");if(m.getData().containsKey("from"))from=m.getData().get("from");}
+              if(!m.getData().isEmpty()){if(m.getData().containsKey("title"))title=m.getData().get("title");if(m.getData().containsKey("body"))body=m.getData().get("body");if(m.getData().containsKey("type"))type=m.getData().get("type");if(m.getData().containsKey("sender_name"))from=m.getData().get("sender_name");}
               try{JSONObject o=new JSONObject();o.put("title",title);o.put("body",body);o.put("type",type);o.put("from",from);getSharedPreferences("woorijip_native",0).edit().putString("pending_push",o.toString()).apply();}catch(Exception ignored){}
               NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
               if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CH,"완후율 알림",NotificationManager.IMPORTANCE_HIGH));
