@@ -57,7 +57,7 @@
         // 새 구독 생성
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array('YOUR_VAPID_PUBLIC_KEY') // TODO: 실제 VAPID 키로 변경
+          applicationServerKey: urlBase64ToUint8Array('BKeqJrPPFWLRpKqQ9gAwfzXA3zJOz7oFqvTiVIhMcc7B0LoCekcSttYcBo5IlG6IceA4m8UEIxusNTKQIPztCHY') // Firebase Cloud Messaging 웹 푸시 공개 키
         });
         console.log('[App] Push subscription created:', subscription);
         
@@ -71,7 +71,7 @@
           console.log('[App] Subscription expired, renewing...');
           subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array('YOUR_VAPID_PUBLIC_KEY')
+            applicationServerKey: urlBase64ToUint8Array('BKeqJrPPFWLRpKqQ9gAwfzXA3zJOz7oFqvTiVIhMcc7B0LoCekcSttYcBo5IlG6IceA4m8UEIxusNTKQIPztCHY')
           });
           await sendSubscriptionToServer(subscription);
         }
