@@ -290,7 +290,7 @@ return r;
             function wrapDm(){
               if(typeof window.sendDm!=='function'||window.sendDm.__v22Push)return;
               const original=window.sendDm;
-          window.sendDm=async function(){
+window.sendDm=async function(){
   const box=document.getElementById('dmInputBox');
   const text=box?.value?.trim()||'';
 
