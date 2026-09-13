@@ -79,10 +79,35 @@ jobs:
                   const box=document.getElementById('dmInputBox');
                   const text=box?.value?.trim()||'';
                   const target=(typeof family!=='undefined'&&activePersonIndex!==null)?family[activePersonIndex]:'';
-                  const before=typeof dmMessagesList!=='undefined'?dmMessagesList.length:0;
-                  const r=await original.apply(this,arguments);
-                  if(text&&target&&typeof dmMessagesList!=='undefined'&&dmMessagesList.length>before)push({sender_name:me(),receiver_name:target,content:text},'dm');
-                  return r;
+               onst r=await original.apply(this,arguments);
+
+// dmMessagesList가 갱신되는 타이밍과 무관하게,
+// 입력 텍스트와 선택된 수신자가 있으면 1:1 FCM 푸시를 요청한다.
+if(text&&target&&me()){
+  try{
+    const row=
+      typeof dmMessagesList!=='undefined'
+        ? dmMessagesList[dmMessagesList.length-1]
+        : null;
+
+    if(row?.id){
+      await broadcastDm(row);
+    }
+
+    await push(
+      {
+        sender_name:me(),
+        receiver_name:target,
+        content:text
+      },
+      'dm'
+    );
+  }catch(error){
+    console.warn('[Woorijip] DM push request failed:',error);
+  }
+}
+
+return r;
                 };
                 window.sendDm.__v20Push=true;
               }
