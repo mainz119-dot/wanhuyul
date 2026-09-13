@@ -4448,15 +4448,8 @@ async function startVideoCall(){
     createVideoPeer();
     openVideoCallUI(name,'상대방의 응답을 기다리는 중…');
     sendVideoSignal({type:'invite',from:currentUser,to:name});
-    // v18: 앱이 꺼져있어도 푸시가 가도록 Edge Function 직접 호출
-    try{
-      fetch('https://ogrqjrtulhrpuuqnymkh.supabase.co/functions/v1/send-push', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({record:{sender_name:currentUser, receiver_name:name, content:'영상통화'}, type:'video'})
-      }).catch(()=>{});
-    }catch(e){}
-
+    // v24: 푸시 발송은 APK 빌드 시 주입되는 startVideoCall 래퍼(push())가 전담한다.
+    // 예전엔 여기서도 send-push를 직접 fetch로 호출해서 영상통화 한 번에 푸시가 2번씩 갔었다.
   }catch(e){
     cleanupVideoCall();
   }
@@ -7465,13 +7458,20 @@ function updateLocationSharePermissionUI(){
 }
 
 function updateLocationStatusUI(){
-  // v18 patch: 항상 최신 상태 반영
+  // v24: 실제 서버에 위치가 반영됐는지(family_locations의 최신 updated_at)로 상태를 표시한다.
+  // 이전엔 로컬 플래그(isLocationSharing)만 보고 "공유 중"을 띄워서, 네이티브 GPS 서비스가
+  // 권한/RLS 문제 등으로 조용히 실패해도 화면엔 항상 "공유 중"으로 뻥 뜨는 문제가 있었다.
   try{
     const btn=document.getElementById('locationShareBtn');
     const status=document.getElementById('locationStatus');
     const enabled=isFamilyLocationSharingEnabled(currentUser);
     if(btn) btn.textContent = enabled ? '내 위치 공유 중지' : '내 위치 공유 시작';
-    if(status) status.textContent = enabled ? (isLocationSharing ? '🟢 공유 중' : '🟡 GPS 연결 중...') : '⚪ 공유 중지';
+    if(status){
+      if(!enabled) status.textContent='⚪ 공유 중지';
+      else if(isLocationOnline(myLastLocation()?.updated_at)) status.textContent='🟢 공유 중';
+      else if(isLocationSharing) status.textContent='🟡 GPS 연결 중...';
+      else status.textContent='🔴 공유 안 됨 (권한/네트워크 확인 필요)';
+    }
   }catch(e){}
 }
 function updateLocationStatusUI_original(){
@@ -10153,7 +10153,8 @@ window.addEventListener('load',()=>{setTimeout(()=>{loadFamilyStatuses();fillSch
           console.log('Pending push', data);
           if(data.type==='video' && data.from){
             setTimeout(()=>{ showIncomingVideoCall && showIncomingVideoCall(data.from); }, 800);
-          } else if(data.type==='chat'){
+          } else if(data.type==='chat' || data.type==='dm' || data.type==='group'){
+            // v24: dm/group 타입이 여기서 처리 안 돼서 알림을 눌러도 채팅방으로 안 들어가던 문제 수정
             setTimeout(()=>{ goToPage && goToPage('chat'); }, 500);
           }
         }
