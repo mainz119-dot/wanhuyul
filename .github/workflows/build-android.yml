@@ -410,7 +410,11 @@ jobs:
               @JavascriptInterface public void startNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",true).apply();try{ContextCompat.startForegroundService(MainActivity.this,new Intent(MainActivity.this,NativeLocationService.class));}catch(Exception e){android.util.Log.e("WoorijipNative","GPS start",e);}}
               @JavascriptInterface public void stopNativeLocation(){getSharedPreferences(PREF,0).edit().putBoolean("location_enabled",false).apply();try{stopService(new Intent(MainActivity.this,NativeLocationService.class));}catch(Exception ignored){}}
             }
-            @Override public void onCreate(Bundle b){super.onCreate(b);requestPermissionsNow();WebView w=null;try{w=getBridge().getWebView();}catch(Exception e){}if(w!=null){WebSettings st=w.getSettings();st.setJavaScriptEnabled(true);st.setDomStorageEnabled(true);st.setDatabaseEnabled(true);st.setGeolocationEnabled(true);st.setMediaPlaybackRequiresUserGesture(false);st.setAllowFileAccess(true);w.setWebChromeClient(new WebChromeClient(){
+            @Override public void onCreate(Bundle b){super.onCreate(b);
+              // v25: chrome://inspect로 WebView 콘솔/네트워크를 원격 디버깅할 수 있도록 활성화.
+              // 이게 꺼져 있으면 chrome://inspect의 Remote Target 목록에 이 앱이 아예 안 뜬다.
+              try{WebView.setWebContentsDebuggingEnabled(true);}catch(Exception e){}
+              requestPermissionsNow();WebView w=null;try{w=getBridge().getWebView();}catch(Exception e){}if(w!=null){WebSettings st=w.getSettings();st.setJavaScriptEnabled(true);st.setDomStorageEnabled(true);st.setDatabaseEnabled(true);st.setGeolocationEnabled(true);st.setMediaPlaybackRequiresUserGesture(false);st.setAllowFileAccess(true);w.setWebChromeClient(new WebChromeClient(){
               @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback cb){if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED)cb.invoke(origin,true,false);else{pendingGeoOrigin=origin;pendingGeoCallback=cb;ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},PERM+2);}}
               @Override public void onPermissionRequest(PermissionRequest r){runOnUiThread(()->handleWebPermission(r));}
             });w.addJavascriptInterface(new NativeBridge(),"WoorijipNative");
@@ -471,6 +475,7 @@ jobs:
           grep -q 'window.sendGroup.__v22Push' www/index.html
           grep -q 'v22-systembar-fix' www/index.html
           grep -q 'v22-push-fix' android/app/src/main/java/com/woorijip/family/MyFirebaseService.java
+          grep -q 'setWebContentsDebuggingEnabled' android/app/src/main/java/com/woorijip/family/MainActivity.java
       - name: Build debug APK
         shell: bash
         run: |
