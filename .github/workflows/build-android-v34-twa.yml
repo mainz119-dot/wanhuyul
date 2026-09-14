@@ -219,3 +219,6 @@ jobs:
             output/우리집-v34-twa.apk
             output/certificate.txt
             output/woorijip-v34-test.jks
+
+android.useAndroidX=true
+android.enableJetifier=true
