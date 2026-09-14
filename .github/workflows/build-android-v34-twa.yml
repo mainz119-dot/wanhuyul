@@ -12,16 +12,10 @@ jobs:
 
     steps:
 
-      # --------------------------------------------------
-      # 1. GitHub 저장소 가져오기
-      # --------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # --------------------------------------------------
-      # 2. Java
-      # --------------------------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -29,40 +23,29 @@ jobs:
           java-version: "17"
 
 
-      # --------------------------------------------------
-      # 3. Android SDK
-      # --------------------------------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
 
-      # --------------------------------------------------
-      # 4. Gradle
-      # --------------------------------------------------
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
 
 
-      # --------------------------------------------------
-      # 5. TWA Android 프로젝트 생성
-      # --------------------------------------------------
       - name: Create TWA project
         shell: bash
         run: |
 
           set -euo pipefail
 
-          echo "Creating TWA project..."
-
           mkdir -p twa/app/src/main/java/com/woorijip/family
           mkdir -p twa/app/src/main/res/values
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # settings.gradle
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/settings.gradle <<'EOF'
           pluginManagement {
@@ -88,9 +71,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # build.gradle
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/build.gradle <<'EOF'
           plugins {
@@ -99,11 +82,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
-          # ★ gradle.properties
-          # ------------------------------------------------
-          # 이번 오류의 핵심 수정 부분
-          # ------------------------------------------------
+          # ---------------------------------------------
+          # gradle.properties
+          # ---------------------------------------------
 
           cat > twa/gradle.properties <<'EOF'
           android.useAndroidX=true
@@ -112,9 +93,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # app/build.gradle
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/app/build.gradle <<'EOF'
           plugins {
@@ -138,7 +119,6 @@ jobs:
                   versionCode 34
 
                   versionName "34.0"
-
               }
 
               buildTypes {
@@ -146,24 +126,20 @@ jobs:
                   release {
 
                       minifyEnabled false
-
                   }
-
               }
-
           }
 
           dependencies {
 
-              implementation "androidx.browser:browser:1.9.0"
-
+              implementation "androidx.browser:browser:1.8.0"
           }
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # strings.xml
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/app/src/main/res/values/strings.xml <<'EOF'
           <resources>
@@ -174,9 +150,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # styles.xml
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/app/src/main/res/values/styles.xml <<'EOF'
           <resources>
@@ -193,9 +169,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # AndroidManifest.xml
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest
@@ -238,9 +214,9 @@ jobs:
           EOF
 
 
-          # ------------------------------------------------
+          # ---------------------------------------------
           # MainActivity.java
-          # ------------------------------------------------
+          # ---------------------------------------------
 
           cat > twa/app/src/main/java/com/woorijip/family/MainActivity.java <<'EOF'
           package com.woorijip.family;
@@ -267,24 +243,17 @@ jobs:
                   TrustedWebActivityIntentBuilder builder =
                           new TrustedWebActivityIntentBuilder(uri);
 
-                  builder
-                          .build(this)
-                          .launch();
+                  builder.build(this).launch();
 
                   finish();
-
               }
-
           }
           EOF
 
 
-          echo "TWA project created."
-
-
-      # --------------------------------------------------
-      # 6. APK 빌드
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # Build
+      # ---------------------------------------------
 
       - name: Build APK
         working-directory: twa
@@ -293,17 +262,32 @@ jobs:
           gradle assembleRelease --no-daemon
 
 
-      # --------------------------------------------------
-      # 7. 테스트용 서명키 생성
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # Prepare output
+      # ---------------------------------------------
 
-      - name: Generate test signing key
+      - name: Prepare output
         shell: bash
         run: |
 
           set -euo pipefail
 
           mkdir -p output
+
+          cp \
+            twa/app/build/outputs/apk/release/app-release-unsigned.apk \
+            output/우리집-v34-twa-unsigned.apk
+
+
+      # ---------------------------------------------
+      # Create test signing key
+      # ---------------------------------------------
+
+      - name: Generate signing key
+        shell: bash
+        run: |
+
+          set -euo pipefail
 
           keytool -genkeypair \
             -keystore output/woorijip-v34-test.jks \
@@ -316,15 +300,13 @@ jobs:
             -dname "CN=우리집 TWA, OU=Family, O=Woorijip, C=KR"
 
 
-      # --------------------------------------------------
-      # 8. 인증서 SHA-256 확인
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # SHA-256
+      # ---------------------------------------------
 
-      - name: Get SHA256 fingerprint
+      - name: Get certificate fingerprint
         shell: bash
         run: |
-
-          set -euo pipefail
 
           keytool -list -v \
             -keystore output/woorijip-v34-test.jks \
@@ -338,9 +320,9 @@ jobs:
           echo "======================================"
 
 
-      # --------------------------------------------------
-      # 9. APK 서명
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # Sign APK
+      # ---------------------------------------------
 
       - name: Sign APK
         shell: bash
@@ -353,12 +335,12 @@ jobs:
             --ks-pass pass:android \
             --key-pass pass:android \
             --out output/우리집-v34-twa.apk \
-            twa/app/build/outputs/apk/release/app-release-unsigned.apk
+            output/우리집-v34-twa-unsigned.apk
 
 
-      # --------------------------------------------------
-      # 10. APK 검증
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # Verify APK
+      # ---------------------------------------------
 
       - name: Verify APK
         shell: bash
@@ -369,9 +351,9 @@ jobs:
             output/우리집-v34-twa.apk
 
 
-      # --------------------------------------------------
-      # 11. APK 결과 업로드
-      # --------------------------------------------------
+      # ---------------------------------------------
+      # Upload
+      # ---------------------------------------------
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
