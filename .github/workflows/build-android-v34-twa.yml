@@ -1,0 +1,369 @@
+name: Build 우리집 Android APK v34 - TWA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+
+      - name: Create TWA project
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          mkdir -p twa/app/src/main/java/com/woorijip/family
+          mkdir -p twa/app/src/main/res/values
+
+
+          # ---------------------------------------------
+          # settings.gradle
+          # ---------------------------------------------
+
+          cat > twa/settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "WoorijipTWA"
+
+          include(":app")
+          EOF
+
+
+          # ---------------------------------------------
+          # build.gradle
+          # ---------------------------------------------
+
+          cat > twa/build.gradle <<'EOF'
+          plugins {
+              id "com.android.application" version "8.6.1" apply false
+          }
+          EOF
+
+
+          # ---------------------------------------------
+          # gradle.properties
+          # ---------------------------------------------
+
+          cat > twa/gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
+
+          # ---------------------------------------------
+          # app/build.gradle
+          # ---------------------------------------------
+
+          cat > twa/app/build.gradle <<'EOF'
+          plugins {
+              id "com.android.application"
+          }
+
+          android {
+
+              namespace "com.woorijip.family"
+
+              compileSdk 35
+
+              defaultConfig {
+
+                  applicationId "com.woorijip.family"
+
+                  minSdk 23
+
+                  targetSdk 35
+
+                  versionCode 34
+
+                  versionName "34.0"
+              }
+
+              buildTypes {
+
+                  release {
+
+                      minifyEnabled false
+                  }
+              }
+          }
+
+          dependencies {
+
+              implementation "androidx.browser:browser:1.8.0"
+          }
+          EOF
+
+
+          # ---------------------------------------------
+          # strings.xml
+          # ---------------------------------------------
+
+          cat > twa/app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+
+              <string name="app_name">우리집</string>
+
+          </resources>
+          EOF
+
+
+          # ---------------------------------------------
+          # styles.xml
+          # ---------------------------------------------
+
+          cat > twa/app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+
+              <style
+                  name="AppTheme"
+                  parent="android:style/Theme.Material.Light.NoActionBar">
+
+                  <item name="android:windowNoTitle">true</item>
+
+              </style>
+
+          </resources>
+          EOF
+
+
+          # ---------------------------------------------
+          # AndroidManifest.xml
+          # ---------------------------------------------
+
+          cat > twa/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest
+              xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission
+                  android:name="android.permission.INTERNET" />
+
+              <application
+
+                  android:allowBackup="false"
+
+                  android:label="@string/app_name"
+
+                  android:supportsRtl="true"
+
+                  android:theme="@style/AppTheme">
+
+                  <activity
+
+                      android:name=".MainActivity"
+
+                      android:exported="true">
+
+                      <intent-filter>
+
+                          <action
+                              android:name="android.intent.action.MAIN" />
+
+                          <category
+                              android:name="android.intent.category.LAUNCHER" />
+
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+
+          # ---------------------------------------------
+          # MainActivity.java
+          # ---------------------------------------------
+
+          cat > twa/app/src/main/java/com/woorijip/family/MainActivity.java <<'EOF'
+          package com.woorijip.family;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.net.Uri;
+
+          import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
+
+          public class MainActivity extends Activity {
+
+              private static final String START_URL =
+                      "https://mainz119-dot.github.io/wanhuyul/";
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+
+                  super.onCreate(savedInstanceState);
+
+                  Uri uri =
+                          Uri.parse(START_URL);
+
+                  TrustedWebActivityIntentBuilder builder =
+                          new TrustedWebActivityIntentBuilder(uri);
+
+                  builder.build(this).launch();
+
+                  finish();
+              }
+          }
+          EOF
+
+
+      # ---------------------------------------------
+      # Build
+      # ---------------------------------------------
+
+      - name: Build APK
+        working-directory: twa
+        run: |
+
+          gradle assembleRelease --no-daemon
+
+
+      # ---------------------------------------------
+      # Prepare output
+      # ---------------------------------------------
+
+      - name: Prepare output
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          mkdir -p output
+
+          cp \
+            twa/app/build/outputs/apk/release/app-release-unsigned.apk \
+            output/우리집-v34-twa-unsigned.apk
+
+
+      # ---------------------------------------------
+      # Create test signing key
+      # ---------------------------------------------
+
+      - name: Generate signing key
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          keytool -genkeypair \
+            -keystore output/woorijip-v34-test.jks \
+            -storepass android \
+            -keypass android \
+            -alias woorijip \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=우리집 TWA, OU=Family, O=Woorijip, C=KR"
+
+
+      # ---------------------------------------------
+      # SHA-256
+      # ---------------------------------------------
+
+      - name: Get certificate fingerprint
+        shell: bash
+        run: |
+
+          keytool -list -v \
+            -keystore output/woorijip-v34-test.jks \
+            -storepass android \
+            > output/certificate.txt
+
+          echo "======================================"
+
+          grep "SHA256:" output/certificate.txt || true
+
+          echo "======================================"
+
+
+      # ---------------------------------------------
+      # Sign APK
+      # ---------------------------------------------
+
+      - name: Sign APK
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
+            --ks output/woorijip-v34-test.jks \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out output/우리집-v34-twa.apk \
+            output/우리집-v34-twa-unsigned.apk
+
+
+      # ---------------------------------------------
+      # Verify APK
+      # ---------------------------------------------
+
+      - name: Verify APK
+        shell: bash
+        run: |
+
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify \
+            --verbose \
+            output/우리집-v34-twa.apk
+
+
+      # ---------------------------------------------
+      # Upload
+      # ---------------------------------------------
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+
+        with:
+
+          name: woorijip-v34-twa
+
+          path: |
+
+            output/우리집-v34-twa.apk
+
+            output/certificate.txt
