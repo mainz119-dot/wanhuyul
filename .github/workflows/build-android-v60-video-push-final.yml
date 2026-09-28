@@ -1,0 +1,75 @@
+name: Build 우리집 Android APK v60 - reliable video push
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  patch-and-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch v59 video push to v60
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path(".github/workflows/build-android-v59-final.yml")
+          s = p.read_text(encoding="utf-8")
+
+          # v59 already contains the video-call caller patch.
+          # Patch only the stable sendVideoSignal(...) call, so this does not
+          # depend on the exact surrounding v59 block text.
+          old = "sendVideoSignal({type:'invite',from:currentUser,to:name});"
+          if s.count(old) != 1:
+              raise SystemExit(
+                  f"Expected exactly 1 video signal caller, found {s.count(old)}"
+              )
+
+          new = """try{ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),8000); const r=await fetch(SUPABASE_URL+'/functions/v1/send-push',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY},body:JSON.stringify({record:{sender_name:currentUser,receiver_name:name,content:'영상통화'},type:'video'}),signal:controller.signal}); clearTimeout(timer); const body=await r.text(); console.log('[v60] VIDEO PUSH HTTP',r.status,body); if(!r.ok) throw new Error('send-push HTTP '+r.status+': '+body); }catch(e){ console.warn('[v60] video push failed, continuing call',e); }
+          sendVideoSignal({type:'invite',from:currentUser,to:name});"""
+
+          s = s.replace(old, new, 1)
+
+          # Rename the workflow/artifact labels for the generated build.
+          s = s.replace(
+              "name: Build 우리집 Android APK v59 - direct-video-push",
+              "name: Build 우리집 Android APK v60 - reliable video push",
+              1
+          )
+          s = s.replace(
+              "name: wanhuyul-apk-v59-direct-video-push",
+              "name: wanhuyul-apk-v60-reliable-video-push",
+              1
+          )
+
+          p.write_text(s, encoding="utf-8")
+          print("v60 patch applied successfully")
+
+      - name: Commit patched v59 workflow as v60
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/build-android-v59-final.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "fix: reliable video push for v60"
+            git push
+          fi
+
+      - name: Run patched Android build
+        shell: bash
+        run: |
+          set -e
+          gh workflow run build-android-v59-final.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
