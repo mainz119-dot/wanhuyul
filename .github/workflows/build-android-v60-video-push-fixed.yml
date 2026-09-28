@@ -1,0 +1,99 @@
+name: Build 우리집 Android APK v60 - reliable video push
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  patch-and-build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch v59 workflow for v60 video push
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path(".github/workflows/build-android-v59-final.yml")
+          s = p.read_text(encoding="utf-8")
+
+          old = """name: Build 우리집 Android APK v59 - direct-video-push"""
+          s = s.replace(old, """name: Build 우리집 Android APK v60 - reliable-video-push""", 1)
+
+          old = """          /* v55: direct patch of original caller. No sendVideoSignal wrapper/delay. */
+          html=html.replace(
+            "sendVideoSignal({type:'invite',from:currentUser,to:name});",
+            "try{ const started=Date.now(); const result=await sb.functions.invoke('send-push',{body:{record:{sender_name:currentUser,receiver_name:name,content:'영상통화'},type:'video'}}); console.log('[v59] VIDEO PUSH RESULT',JSON.stringify(result.data||null),result.error||null,'ms=',Date.now()-started); }catch(e){ console.warn('[v59] video push invoke',e); }\\n    sendVideoSignal({type:'invite',from:currentUser,to:name});"
+          );"""
+
+          new = """          /* v60: call send-push directly before signaling. Push failure never blocks the call. */
+          html=html.replace(
+            "sendVideoSignal({type:'invite',from:currentUser,to:name});",
+            "try{ await window.sendVideoPushV60({sender_name:currentUser,receiver_name:name,content:'영상통화'}); }catch(e){ console.warn('[v60] video push failed, continuing call',e); }\n    sendVideoSignal({type:'invite',from:currentUser,to:name});"
+          );"""
+          if old not in s:
+              raise SystemExit("v59 video-push block not found")
+          s = s.replace(old, new, 1)
+
+          marker = """          const js=`
+          <script id="woorijip-v25-fixes-js">
+          (function(){"""
+          injected = """          const js=`
+          <script id="woorijip-v25-fixes-js">
+          window.sendVideoPushV60=async function(record){
+            const controller=new AbortController();
+            const timer=setTimeout(()=>controller.abort(),8000);
+            try{
+              const r=await fetch(SUPABASE_URL+'/functions/v1/send-push',{
+                method:'POST',
+                headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY},
+                body:JSON.stringify({record,type:'video'}),
+                signal:controller.signal
+              });
+              const body=await r.text();
+              console.log('[v60] VIDEO PUSH HTTP',r.status,body);
+              if(!r.ok) throw new Error('send-push HTTP '+r.status+': '+body);
+              try{const parsed=JSON.parse(body);if(parsed&&parsed.sent===0)console.warn('[v60] VIDEO PUSH sent=0',parsed);}catch(_){}
+              return body;
+            }finally{clearTimeout(timer);}
+          };
+          (function(){"""
+          if marker not in s:
+              raise SystemExit("v25 JS marker not found")
+          s = s.replace(marker, injected, 1)
+
+          s = s.replace(
+              "name: wanhuyul-apk-v59-direct-video-push",
+              "name: wanhuyul-apk-v60-reliable-video-push",
+              1
+          )
+
+          p.write_text(s, encoding="utf-8")
+
+      - name: Commit v60 patch
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/build-android-v59-final.yml
+          git diff --cached --quiet && echo "No patch needed" && exit 0
+          git commit -m "Fix video call push for v60"
+          git push
+
+      - name: Run patched v59 build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          gh workflow run build-android-v59-final.yml --ref main
+          echo "v60 patch committed and v59 build dispatched."
