@@ -1028,7 +1028,7 @@ jobs:
           test -f android/app/src/main/java/com/woorijip/family/MyFirebaseService.java
           grep -q 'startVideoAlert' android/app/src/main/java/com/woorijip/family/MainActivity.java
           grep -q 'android.permission.VIBRATE' android/app/src/main/AndroidManifest.xml
-          grep -q 'woorijip-v60-call-controls' www/index.html
+          grep -q 'woorijip-v61-call-controls' www/index.html
       - name: Build debug APK
         shell: bash
         run: |
