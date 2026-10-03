@@ -1,4 +1,4 @@
-name: Build 완후율 Android APK v70 - schedule-period-fix
+name: Build 완후율 Android APK v71 - schedule-period-fix
 
 on:
   workflow_dispatch:
